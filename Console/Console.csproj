@@ -8,10 +8,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Communication\" />
-    <Folder Include="Data\" />
-    <Folder Include="Services\" />
-    <Folder Include="Utils\" />
+    <Compile Remove="Communication\**" />
+    <Compile Remove="Data\**" />
+    <Compile Remove="Services\**" />
+    <Compile Remove="Utils\**" />
+    <EmbeddedResource Remove="Communication\**" />
+    <EmbeddedResource Remove="Data\**" />
+    <EmbeddedResource Remove="Services\**" />
+    <EmbeddedResource Remove="Utils\**" />
+    <None Remove="Communication\**" />
+    <None Remove="Data\**" />
+    <None Remove="Services\**" />
+    <None Remove="Utils\**" />
   </ItemGroup>
 
 </Project>
