@@ -142,14 +142,13 @@ Public Class SEI_AddonEnum
     Public Structure enAddonFormType
         ' FORMULARIOS USUARIO
         Const f_AddonSettings As String = "SEICONFIG"
-        Const f_GestionChatarra As String = "SEIGESTFERR"
-        Const f_ExcelGasoil As String = "SEIEXCELGASOIL"
+        Const f_MonitorComandes As String = "SEI_MonitorComandes"
     End Structure
     Public Structure enAddonMenus
         ' MENUS ADD-ON:
         Const ConfigurarAddon As String = "SEI_ConfigurarAddon"
-        Const GestionChatarra As String = "SEI_GestFerralla"
-        Const ExcelGasoil As String = "SEI_ExcelGasoil"
+        Const MonitorComandes As String = "SEI_MonitorComandes"
+
     End Structure
 #End Region
 
