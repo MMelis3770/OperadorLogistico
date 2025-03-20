@@ -1,5 +1,6 @@
 ﻿Option Explicit On
 Imports SAPbouiCOM
+Imports SEI.MonitorDeComandes.SEI_AddonEnum
 Imports SEI.SEI_ADDON.SEI_AddonEnum
 Public Class SEI_AlbaranCompras
     Inherits SEI_Form

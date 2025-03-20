@@ -1,6 +1,6 @@
 Option Explicit On
 '
-Imports SEI.SEI_ADDON.SEI_AddOnEnum
+Imports SEI.MonitorDeComandes.SEI_AddonEnum
 
 Public MustInherit Class SEI_Form
 
@@ -22,11 +22,11 @@ Public MustInherit Class SEI_Form
 #End Region
 
 #Region "Constructor"
-    Public Sub New(ByRef ParentAddon As SEI_Addon, _
-               ByVal SBO_LoadFormType As SEI_AddOnEnum.enSBO_LoadFormTypes, _
-               ByVal pst_FormType As String, _
-               Optional ByVal FormUID As String = "", _
-               Optional ByVal UDOName As String = "", _
+    Public Sub New(ByRef ParentAddon As SEI_Addon,
+               ByVal SBO_LoadFormType As SEI_AddonEnum.enSBO_LoadFormTypes,
+               ByVal pst_FormType As String,
+               Optional ByVal FormUID As String = "",
+               Optional ByVal UDOName As String = "",
                Optional ByVal FormLoadVisible As Boolean = False)
         Try
             m_FormUID = FormUID

@@ -4,7 +4,6 @@ Imports System.Timers
 '
 Imports System.Xml
 Imports DatabaseConnection
-Imports SEI.SEI_ADDON.SEI_AddonEnum
 Imports SEIDOR_SLayer
 '
 Public MustInherit Class SEI_Addon
@@ -50,8 +49,7 @@ Public MustInherit Class SEI_Addon
         '[PROGRAMAR]
         oFilter = oFilters.Add(SAPbouiCOM.BoEventTypes.et_ALL_EVENTS)
         oFilter.AddEx(SEI_AddonEnum.enAddonFormType.f_AddonSettings)
-        oFilter.AddEx(SEI_AddonEnum.enAddonFormType.f_GestionChatarra)
-        oFilter.AddEx(SEI_AddonEnum.enAddonFormType.f_ExcelGasoil)
+        oFilter.AddEx(SEI_AddonEnum.enAddonFormType.f_MonitorComandes)
 
         'SAP FORMS
         'oFilter.AddEx(SEI_AddonEnum.enSAPFormType.f_InterlocutoresComerciales)
@@ -133,11 +131,9 @@ Public MustInherit Class SEI_Addon
         '
         'Menú Modelo:
 
-        Me.AddMenuItem(enAddonMenus.GestionChatarra, "43540", False, True, "", -1, "Vaciado de Almacén 39", SAPbouiCOM.BoMenuType.mt_STRING)
-
         'Me.AddMenuItem(enAddonMenus.ExcelGasoil, "43540", False, True, "", -1, "Carga Excel Gasoil", SAPbouiCOM.BoMenuType.mt_POPUP)
-        Me.AddMenuItem(enAddonMenus.ExcelGasoil, "2304", False, True, "", -1, "Carga Excel Gasoil", SAPbouiCOM.BoMenuType.mt_STRING)
-        '
+
+        'Colocar monitorcomandes a on correspongui
     End Sub
     Private Sub AddMenuItem(ByVal sIDMenu As String, ByVal sFatherMenu As String, ByVal bChecked As Boolean, ByVal bEnabled As Boolean, ByVal sImage As String,
                             ByVal iPosition As Integer, ByVal sNombre As String, ByVal iType As SAPbouiCOM.BoMenuType)

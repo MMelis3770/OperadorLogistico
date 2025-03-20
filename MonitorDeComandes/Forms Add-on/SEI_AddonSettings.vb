@@ -9,6 +9,7 @@ Imports SAPbouiCOM.BoCellClickType
 Imports SAPbouiCOM.BoEventTypes
 Imports SAPbouiCOM.BoFormMode
 Imports SAPbouiCOM.BoModeVisualBehavior
+Imports SEI.MonitorDeComandes.SEI_AddonEnum
 Imports SEI.SEI_ADDON.SEI_AddonEnum
 
 Public Class SEI_AddonSettings

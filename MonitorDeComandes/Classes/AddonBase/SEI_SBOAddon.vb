@@ -176,12 +176,10 @@ Public Class SEI_SBOAddon
                 Select Case pVal.MenuUID.ToUpper
                     Case SEI_AddonEnum.enAddonMenus.ConfigurarAddon.ToUpper
                         Iniciar_Configuracion()
-                    Case SEI_AddonEnum.enAddonMenus.GestionChatarra.ToUpper
+                    Case SEI_AddonEnum.enAddonMenus.MonitorComandes.ToUpper
                         Dim oForm As SEI_Form
-                        oForm = New SEI_GestioFerralla(Me)
-                    Case SEI_AddonEnum.enAddonMenus.ExcelGasoil.ToUpper
-                        Dim oForm As SEI_Form
-                        oForm = New SEI_ExcelGasoil(Me)
+                        oForm = New SEI_MonitorComandes(Me)
+
 
                     Case Else
                         ' AFTER MENU ACTION (Events)
