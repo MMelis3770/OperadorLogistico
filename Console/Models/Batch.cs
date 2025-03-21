@@ -1,4 +1,4 @@
-﻿namespace OperadorLogistico.Models
+﻿namespace OperadorLogistico.Console.Models
 {
     public class Batch
     {

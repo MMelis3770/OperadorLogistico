@@ -1,4 +1,4 @@
-﻿namespace OperadorLogistico.Models
+﻿namespace OperadorLogistico.Console.Models
 {
     public class Order
     {
@@ -8,11 +8,6 @@
         public string DeliveryAddress { get; set; }
         public OrderStatus Status { get; set; }
         public List<OrderLine> Lines { get; set; } = new List<OrderLine>();
-        public string Notes { get; set; }
-        public string SAPReference { get; set; }
-        public bool SentToSAP { get; set; }
-        public DateTime? ConfirmationDate { get; set; }
-        public string ErrorMessage { get; set; }
     }
 
     public enum OrderStatus

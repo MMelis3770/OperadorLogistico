@@ -1,4 +1,4 @@
-﻿namespace OperadorLogistico.Services
+﻿namespace OperadorLogistico.Console.Services
 {
     public class da
     {

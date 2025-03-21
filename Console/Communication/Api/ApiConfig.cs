@@ -1,4 +1,4 @@
-﻿namespace Console.Communication.Api
+﻿namespace OperadorLogistico.Console.Communication.Api
 {
     public class ApiConfig
     {

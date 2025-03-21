@@ -1,4 +1,4 @@
-﻿namespace OperadorLogistico.Data
+﻿namespace OperadorLogistico.Console.Data
 {
     public class dac
     {

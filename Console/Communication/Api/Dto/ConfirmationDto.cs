@@ -1,4 +1,4 @@
-﻿namespace Console.Communication.Api.Dto
+﻿namespace OperadorLogistico.Console.Communication.Api.Dto
 {
     public class ConfirmationDto
     {

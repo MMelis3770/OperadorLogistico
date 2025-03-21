@@ -1,10 +1,10 @@
 ﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using Console.Communication.Api.Dto;
-using OperadorLogistico.Models;
+using OperadorLogistico.Console.Communication.Api.Dto;
+using OperadorLogistico.Console.Models;
 
-namespace Console.Communication.Api
+namespace OperadorLogistico.Console.Communication.Api
 {
     public class ApiClient
     {

@@ -1,6 +1,6 @@
-﻿using OperadorLogistico.Models;
+﻿using OperadorLogistico.Console.Models;
 
-namespace Console.Communication.FileProcessing
+namespace OperadorLogistico.Console.Communication.FileProcessing
 {
     public class OrderFileReader
     {

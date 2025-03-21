@@ -1,4 +1,5 @@
-﻿namespace OperadorLogistico.Models
+﻿
+namespace OperadorLogistico.Console.Models
 {
     public class OrderLine
     {
@@ -7,7 +8,6 @@
         public string ProductCode { get; set; }
         public Product Product { get; set; }
         public decimal RequestedQuantity { get; set; }
-        public decimal AssignedQuantity { get; set; }
 
         // Key: Batch Code, Value: Quantity assigned
         public Dictionary<string, decimal> AssignedBatches { get; set; } = new Dictionary<string, decimal>();
