@@ -1,0 +1,18 @@
+﻿@page "/"
+
+<PageTitle>Home sample</PageTitle>
+
+<h1>Current counter: @currentCount</h1>
+
+<FluentButton class="btn btn-primary" @onclick="IncrementCount">Click me</FluentButton>
+
+@code {
+
+    private int currentCount = 0;
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+
+}

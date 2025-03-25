@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Console.Processes;
+using OperadorLogistico.Console.Processes;
 
 namespace OperadorLogistico.Console
 {
