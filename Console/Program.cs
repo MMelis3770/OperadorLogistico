@@ -1,211 +1,63 @@
 ﻿using B1SLayer;
+using Console.Processes;
 using DatabaseConnection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OperadorLogistico.Console;
 using OperadorLogistico.Console.Communication.Api;
-using OperadorLogistico.Console.Communication.FileProcessing;
+using System.Reflection;
 
-namespace OperadorLogistico.Console
-{
-    public class Program
+using var mutex = new Mutex(true, Assembly.GetEntryAssembly().GetName().Name);
+
+if (!mutex.WaitOne(TimeSpan.Zero, true)) return;
+
+Host.CreateDefaultBuilder()
+    .ConfigureAppConfiguration((builder) =>
     {
-        private readonly SLConnection _slConnection;
-        private readonly IDatabaseConnection _dbConnection;
-        private readonly IConfiguration _configuration;
-        public Program(
-           IConfiguration configuration,
-           SLConnection slConnection,
-           IDatabaseConnection dbConnection
-           )
+        builder.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
+    })
+    .ConfigureServices((context, services) =>
+    {
+        services.AddLogging(configure =>
         {
-            _configuration = configuration;
-            _slConnection = slConnection;
-            _dbConnection = dbConnection;
-        }
-        static async Task Main(string[] args)
+            configure.AddConfiguration(context.Configuration.GetSection("Logging"));
+            configure.AddConsole();
+            configure.AddDebug();
+        });
+        services.AddSingleton<SLConnection>(sp =>
         {
-            try
-            {
-                // Menú principal
-                bool exit = false;
-                while (!exit)
-                {
-                    System.Console.Clear();
-                    System.Console.WriteLine("=== SISTEMA OPERADOR LOGÍSTICO ===");
-                    System.Console.WriteLine("1. Procesar nuevas comandas");
-                    System.Console.WriteLine("2. Ver estado de comandas");
-                    System.Console.WriteLine("3. Enviar confirmaciones pendientes");
-                    System.Console.WriteLine("0. Salir");
-                    System.Console.Write("\nSeleccione una opción: ");
-
-                    string option = System.Console.ReadLine();
-
-                    switch (option)
-                    {
-                        case "1":
-                            await ProcessNewOrdersAsync(serviceProvider);
-                            break;
-                        case "2":
-                            await ViewOrderStatusAsync(serviceProvider);
-                            break;
-                        case "3":
-                            await SendPendingConfirmationsAsync(serviceProvider);
-                            break;
-                        case "0":
-                            exit = true;
-                            break;
-                        default:
-                            System.Console.WriteLine("Opción no válida");
-                            break;
-                    }
-
-                    if (!exit)
-                    {
-                        System.Console.WriteLine("\nPresione cualquier tecla para continuar...");
-                        System.Console.ReadKey();
-                    }
-                }
-
-                System.Console.WriteLine("Aplicación finalizada correctamente");
-            }
-            catch (Exception ex)
-            {
-                System.Console.WriteLine($"Error fatal: {ex.Message}");
-                System.Console.WriteLine("Presione cualquier tecla para salir...");
-                System.Console.ReadKey();
-            }
-        }
-
-        private static async Task ProcessNewOrdersAsync(IServiceProvider serviceProvider)
+            return new SLConnection(
+                context.Configuration.GetSection("SapSettings").GetValue<string>("ServiceUrl"),
+                context.Configuration.GetSection("SapSettings").GetValue<string>("CompanyDb"),
+                context.Configuration.GetSection("SapSettings").GetValue<string>("Username"),
+                context.Configuration.GetSection("SapSettings").GetValue<string>("Password")
+            );
+        });
+        services.AddSingleton<IDatabaseConnection>(sp =>
         {
-            try
-            {
-
-                var orderReader = serviceProvider.GetRequiredService<OrderFileReader>();
-                var newOrders = await orderReader.ReadPendingOrdersAsync();
-
-                if (newOrders.Count == 0)
-                {
-                    System.Console.WriteLine("No hay nuevas comandas para procesar.");
-                    return;
-                }
-
-                System.Console.WriteLine($"Se encontraron {newOrders.Count} comandas para procesar.");
-
-                // Aquí irá el código para procesar las comandas 
-                System.Console.WriteLine("Simulando procesamiento de comandas...");
-                await Task.Delay(2000); // Simulación
-
-                System.Console.WriteLine("Procesamiento completado.");
-            }
-            catch (Exception ex)
-            {
-
-            }
-        }
-
-
-
-        // -----------------------------------------------------------------
-        //private static async Task SyncInventoryWithSapAsync(IServiceProvider serviceProvider, Logger logger, IDatabaseConnection _dbConnection)
-        //{
-        //    try
-        //    {
-        //        logger.LogInfo("Iniciando sincronización de inventario con SAP");
-
-        //        var sapClient = serviceProvider.GetRequiredService<SLConnection>();
-
-        //        System.Console.WriteLine("Obteniendo productos desde SAP...");
-
-        //        try
-        //        {
-
-        //            string itemsQuery = "SELECT ItemCode, ItemName, InventoryUOM where Valid eq 'tYES'";
-        //            var items = _dbConnection.Query<Product>(itemsQuery);
-
-        //            // Convertir a nuestro modelo
-        //            var products = new List<Product>();
-        //            foreach (var item in items)
-        //            {
-        //                products.Add(new Product
-        //                {
-        //                    ItemCode = item.ItemCode,
-        //                    ItemName = item.ItemName,
-        //                    InventoryUOM = item.InventoryUOM
-        //                });
-        //            }
-
-        //            System.Console.WriteLine($"Se obtuvieron {products.Count} productos.");
-
-        //            // Ahora obtenemos los lotes
-        //            System.Console.WriteLine("Obteniendo lotes desde SAP...");
-
-        //            // Usando B1SLayer para consultar lotes
-
-        //            string batchQuery = "SELECT ItemCode, ItemName, InventoryUOM where Valid eq 'tYES'";
-
-        //            var batchNumbers = await sapClient.GetAsync<List<dynamic>>("BatchNumbers",
-        //                select: "ItemCode,BatchNumber,Quantity,ManufacturingDate,ExpirationDate",
-        //                filter: "Quantity gt 0");
-
-        //            // Convertir a nuestro modelo
-        //            var batches = new List<Batch>();
-        //            foreach (var batch in batchNumbers)
-        //            {
-        //                batches.Add(new Batch
-        //                {
-        //                    BatchCode = batch.BatchNumber,
-        //                    ProductCode = batch.ItemCode,
-        //                    AvailableQuantity = batch.Quantity,
-        //                    ProductionDate = batch.ManufacturingDate,
-        //                    ExpiryDate = batch.ExpirationDate
-        //                });
-        //            }
-
-        //            System.Console.WriteLine($"Se obtuvieron {batches.Count} lotes.");
-
-        //            // Aquí guardarías estos datos en tu base de datos local
-        //            System.Console.WriteLine("Simulando actualización de base de datos local...");
-        //            await Task.Delay(2000); // Simulación
-
-        //            System.Console.WriteLine("Sincronización completada.");
-        //        }
-        //        catch (Exception ex)
-        //        {
-        //            logger.LogError($"Error en la comunicación con SAP: {ex.Message}");
-        //            System.Console.WriteLine($"Error en la comunicación con SAP: {ex.Message}");
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        logger.LogError("Error al sincronizar inventario con SAP", ex);
-        //    }
-        //}
-
-        private static async Task ViewOrderStatusAsync(IServiceProvider serviceProvider)
+            return new SQLDatabaseConnection(
+                context.Configuration.GetSection("SQLConnection").GetValue<string>("Server"),
+                context.Configuration.GetSection("SQLConnection").GetValue<string>("Company"),
+                context.Configuration.GetSection("SQLConnection").GetValue<string>("User"),
+                context.Configuration.GetSection("SQLConnection").GetValue<string>("Password")
+            );
+        });
+        services.AddSingleton(sp =>
         {
-            System.Console.WriteLine("Funcionalidad pendiente de implementar.");
-            await Task.CompletedTask;
-        }
-
-        private static async Task SendPendingConfirmationsAsync(IServiceProvider serviceProvider)
-        {
-            try
+            var config = new ApiConfig
             {
+                BaseUrl = context.Configuration.GetSection("ApiSettings").GetValue<string>("BaseUrl"),
+                ApiKey = context.Configuration.GetSection("ApiSettings").GetValue<string>("ApiKey"),
+                TimeoutSeconds = context.Configuration.GetSection("ApiSettings").GetValue<int>("TimeoutSeconds")
+            };
+            return new ApiClient(config);
+        });
 
-                var apiClient = serviceProvider.GetRequiredService<ApiClient>();
+        services.AddSingleton<OrderManagement>();
+        services.AddHostedService<ProcessWorker>();
+    })
+    .Build().Run();
 
-                // Aquí obtendrías las confirmaciones pendientes de tu base de datos local
-                System.Console.WriteLine("Simulando obtención de confirmaciones pendientes...");
-                await Task.Delay(1000); // Simulación
-
-                System.Console.WriteLine("No hay confirmaciones pendientes para enviar.");
-            }
-            catch (Exception ex)
-            {
-
-            }
-        }
-    }
-}
+mutex.ReleaseMutex();
