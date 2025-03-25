@@ -1,0 +1,30 @@
+﻿/*.buttonContainer {
+    margin-top: 5rem;
+    display: flex;
+    row-gap: 1rem;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.btnLink {
+    display: block;
+    padding: 1rem 2rem;
+    text-align: center;
+    font-size: 1rem;
+    margin: 0 auto;
+    text-transform: uppercase;
+    letter-spacing: var(--spacing);
+    background: var(--clr-primary-5);
+    color: var(--clr-white);
+    transition: var(--transition);
+    cursor: pointer;
+    border: 1px solid;
+    width: 300px;
+}
+
+    .btnLink:hover {
+        color: var(--clr-primary-5);
+        background: var(--clr-white);
+        border-color: var(--clr-primary-5);
+    }*/
