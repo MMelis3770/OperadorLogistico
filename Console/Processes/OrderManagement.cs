@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 using OperadorLogistico.Console.Communication.Api;
 using OperadorLogistico.Console.Communication.FileProcessing;
 
-namespace OperadorLogistico.Console
+namespace OperadorLogistico.Console.Processes
 {
     public class OrderManagement
     {
