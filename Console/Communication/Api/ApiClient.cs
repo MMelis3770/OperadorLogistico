@@ -70,7 +70,7 @@ namespace OperadorLogistico.Console.Communication.Api
                     LineNumber = line.LineNumber,
                     ProductCode = line.ProductCode,
                     RequestedQuantity = line.RequestedQuantity,
-                    AssignedQuantity = line.AssignedQuantity,
+                    //AssignedQuantity = line.AssignedQuantity,
                     Status = line.Status.ToString()
                 };
 

@@ -26,7 +26,7 @@ namespace OperadorLogistico.Console.Communication.FileProcessing
             // Escribir líneas con lotes asignados
             foreach (var line in order.Lines)
             {
-                sb.AppendLine($"{line.LineNumber}|{line.ProductCode}|{line.RequestedQuantity}|{line.AssignedQuantity}|{line.Status}");
+                //sb.AppendLine($"{line.LineNumber}|{line.ProductCode}|{line.RequestedQuantity}|{line.AssignedQuantity}|{line.Status}");
 
                 // Escribir los lotes asignados a esta línea
                 foreach (var batch in line.AssignedBatches)

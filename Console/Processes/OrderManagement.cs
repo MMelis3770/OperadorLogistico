@@ -1,29 +1,59 @@
 ﻿using B1SLayer;
 using DatabaseConnection;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OperadorLogistico.Console.Communication.Api;
 using OperadorLogistico.Console.Communication.FileProcessing;
 
 namespace OperadorLogistico.Console
 {
-    public class Program
+    public class OrderManagement
     {
         private readonly SLConnection _slConnection;
         private readonly IDatabaseConnection _dbConnection;
         private readonly IConfiguration _configuration;
-        public Program(
-           IConfiguration configuration,
-           SLConnection slConnection,
-           IDatabaseConnection dbConnection
-           )
+        private readonly ILogger<OrderManagement> _logger;
+        private readonly ApiClient _apiClient;
+        private readonly OrderFileReader _orderReader;
+
+        public OrderManagement(
+            IConfiguration configuration,
+            SLConnection slConnection,
+            IDatabaseConnection dbConnection,
+            ILogger<OrderManagement> logger,
+            ApiClient apiClient,
+            OrderFileReader orderReader)
         {
             _configuration = configuration;
             _slConnection = slConnection;
             _dbConnection = dbConnection;
+            _logger = logger;
+            _apiClient = apiClient;
+            _orderReader = orderReader;
         }
-        static async Task Main(string[] args)
+
+        public void Execute()
+        {
+            try
+            {
+                _logger.LogInformation("Iniciando proceso de gestión de órdenes");
+
+                // Process new orders
+                ProcessNewOrdersAsync().GetAwaiter().GetResult();
+
+                // Send any pending confirmations
+                SendPendingConfirmationsAsync().GetAwaiter().GetResult();
+
+                _logger.LogInformation("Proceso de gestión de órdenes completado");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error en la ejecución del proceso: {Message}", ex.Message);
+                throw;
+            }
+        }
+
+        public async Task RunConsoleMenuAsync()
         {
             try
             {
@@ -44,13 +74,13 @@ namespace OperadorLogistico.Console
                     switch (option)
                     {
                         case "1":
-                            await ProcessNewOrdersAsync(serviceProvider);
+                            await ProcessNewOrdersAsync();
                             break;
                         case "2":
-                            await ViewOrderStatusAsync(serviceProvider);
+                            await ViewOrderStatusAsync();
                             break;
                         case "3":
-                            await SendPendingConfirmationsAsync(serviceProvider);
+                            await SendPendingConfirmationsAsync();
                             break;
                         case "0":
                             exit = true;
@@ -71,19 +101,18 @@ namespace OperadorLogistico.Console
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error fatal: {Message}", ex.Message);
                 System.Console.WriteLine($"Error fatal: {ex.Message}");
                 System.Console.WriteLine("Presione cualquier tecla para salir...");
                 System.Console.ReadKey();
             }
         }
 
-        private static async Task ProcessNewOrdersAsync(IServiceProvider serviceProvider)
+        private async Task ProcessNewOrdersAsync()
         {
             try
             {
-
-                var orderReader = serviceProvider.GetRequiredService<OrderFileReader>();
-                var newOrders = await orderReader.ReadPendingOrdersAsync();
+                var newOrders = await _orderReader.ReadPendingOrdersAsync();
 
                 if (newOrders.Count == 0)
                 {
@@ -101,20 +130,41 @@ namespace OperadorLogistico.Console
             }
             catch (Exception ex)
             {
-
+                _logger.LogError(ex, "Error al procesar nuevas órdenes: {Message}", ex.Message);
             }
         }
 
+        private async Task ViewOrderStatusAsync()
+        {
+            System.Console.WriteLine("Funcionalidad pendiente de implementar.");
+            await Task.CompletedTask;
+        }
+
+        private async Task SendPendingConfirmationsAsync()
+        {
+            try
+            {
+                // Aquí obtendrías las confirmaciones pendientes de tu base de datos local
+                System.Console.WriteLine("Simulando obtención de confirmaciones pendientes...");
+                await Task.Delay(1000); // Simulación
+
+                System.Console.WriteLine("No hay confirmaciones pendientes para enviar.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error al enviar confirmaciones pendientes: {Message}", ex.Message);
+            }
+        }
+    }
+}
 
 
         // -----------------------------------------------------------------
-        //private static async Task SyncInventoryWithSapAsync(IServiceProvider serviceProvider, Logger logger, IDatabaseConnection _dbConnection)
+        //private async Task SyncInventoryWithSapAsync()
         //{
         //    try
         //    {
-        //        logger.LogInfo("Iniciando sincronización de inventario con SAP");
-
-        //        var sapClient = serviceProvider.GetRequiredService<SLConnection>();
+        //        _logger.LogInformation("Iniciando sincronización de inventario con SAP");
 
         //        System.Console.WriteLine("Obteniendo productos desde SAP...");
 
@@ -145,7 +195,7 @@ namespace OperadorLogistico.Console
 
         //            string batchQuery = "SELECT ItemCode, ItemName, InventoryUOM where Valid eq 'tYES'";
 
-        //            var batchNumbers = await sapClient.GetAsync<List<dynamic>>("BatchNumbers",
+        //            var batchNumbers = await _slConnection.GetAsync<List<dynamic>>("BatchNumbers",
         //                select: "ItemCode,BatchNumber,Quantity,ManufacturingDate,ExpirationDate",
         //                filter: "Quantity gt 0");
 
@@ -173,39 +223,12 @@ namespace OperadorLogistico.Console
         //        }
         //        catch (Exception ex)
         //        {
-        //            logger.LogError($"Error en la comunicación con SAP: {ex.Message}");
+        //            _logger.LogError("Error en la comunicación con SAP: {Message}", ex.Message);
         //            System.Console.WriteLine($"Error en la comunicación con SAP: {ex.Message}");
         //        }
         //    }
         //    catch (Exception ex)
         //    {
-        //        logger.LogError("Error al sincronizar inventario con SAP", ex);
+        //        _logger.LogError(ex, "Error al sincronizar inventario con SAP");
         //    }
         //}
-
-        private static async Task ViewOrderStatusAsync(IServiceProvider serviceProvider)
-        {
-            System.Console.WriteLine("Funcionalidad pendiente de implementar.");
-            await Task.CompletedTask;
-        }
-
-        private static async Task SendPendingConfirmationsAsync(IServiceProvider serviceProvider)
-        {
-            try
-            {
-
-                var apiClient = serviceProvider.GetRequiredService<ApiClient>();
-
-                // Aquí obtendrías las confirmaciones pendientes de tu base de datos local
-                System.Console.WriteLine("Simulando obtención de confirmaciones pendientes...");
-                await Task.Delay(1000); // Simulación
-
-                System.Console.WriteLine("No hay confirmaciones pendientes para enviar.");
-            }
-            catch (Exception ex)
-            {
-
-            }
-        }
-    }
-}
