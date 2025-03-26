@@ -15,6 +15,7 @@ namespace Console.Processes
         private readonly IConfiguration _configuration;
         private readonly ILogger<InventorySync> _logger;
         private readonly List<Product> _inventory;
+        private readonly List<Batch> _batches;
 
         public InventorySync(
             IConfiguration configuration,
@@ -29,13 +30,14 @@ namespace Console.Processes
             _LOdbConnection = LOdbConnection;
             _logger = logger;
             _inventory = new List<Product>();
+            _batches = new List<Batch>();
         }
         public void Execute()
         {
-            //GetInventoryFromSap();
+            //GetInventoryFromSAP();
             //SetInventoryToLogisticOperator();
         }
-        private void GetInventoryFromSap()
+        private void GetInventoryFromSAP()
         {
             //Select to get all the products in SAP
             string InventoryQuery = "SELECT ItemCode, ItemName, UnitPrice, Quantity, Category FROM OITM";
@@ -47,7 +49,20 @@ namespace Console.Processes
                     _inventory.Add(product);
                 }
             }
-            _logger.LogInformation("Datos maestros de articulo cargados correctamente: {InventoryCount}", _inventory.Count);
+            _logger.LogInformation("Inventory loaded sucessfully: {InventoryCount}", _inventory.Count);
+        }
+        private void GetBatchesFromSAP()
+        {
+            string BatchQuery = "";
+            var batches = _SAPdbConnection.Query<Batch>(BatchQuery);
+            foreach(Batch batch in batches)
+            {
+                if(batch!= null)
+                {
+                    _batches.Add(batch);
+                }
+            }
+            _logger.LogInformation("Batches loaded sucessfully: {Batches}", _batches.Count);
         }
         private void SetInventoryToLogisticOperator()
         {
@@ -59,7 +74,19 @@ namespace Console.Processes
                     _LOdbConnection.Query<Product>(InventoryInsert);
                 }
             }
-            _logger.LogInformation("Datos maestros de articulo insertados correctamente: {InventoryCount}", _inventory.Count);
+            _logger.LogInformation("Inventory imported sucessfully: {InventoryCount}", _inventory.Count);
+        }
+        private void SetBatchesToLogisticOperator()
+        {
+            foreach (Product product in _inventory)
+            {
+                if (product != null)
+                {
+                    string InventoryInsert = $")";
+                    _LOdbConnection.Query<Product>(InventoryInsert);
+                }
+            }
+            _logger.LogInformation("Inventory imported sucessfully: {InventoryCount}", _inventory.Count);
         }
     }
 }

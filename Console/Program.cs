@@ -90,7 +90,6 @@ namespace OperadorLogistico.Console
                             return new ApiClient(config);
                         });
 
-                        //services.AddSingleton<OrderManagement>();
                         services.AddSingleton<InventorySync>();
                         services.AddHostedService<ProcessWorker>();
                     })
