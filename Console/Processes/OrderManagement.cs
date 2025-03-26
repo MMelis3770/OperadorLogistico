@@ -10,7 +10,8 @@ namespace OperadorLogistico.Console.Processes
     public class OrderManagement
     {
         private readonly SLConnection _slConnection;
-        private readonly IDatabaseConnection _dbConnection;
+        private readonly ISapDatabaseConnection _SAPdbConnection;
+        private readonly ILogisticOperatorDatabaseConnection _LOdbConnection;
         private readonly IConfiguration _configuration;
         private readonly ILogger<OrderManagement> _logger;
         private readonly ApiClient _apiClient;
@@ -19,14 +20,16 @@ namespace OperadorLogistico.Console.Processes
         public OrderManagement(
             IConfiguration configuration,
             SLConnection slConnection,
-            IDatabaseConnection dbConnection,
+            ISapDatabaseConnection SAPdbConnection,
+            ILogisticOperatorDatabaseConnection LOdbConnection,
             ILogger<OrderManagement> logger,
             ApiClient apiClient,
             OrderFileReader orderReader)
         {
             _configuration = configuration;
             _slConnection = slConnection;
-            _dbConnection = dbConnection;
+            _SAPdbConnection = SAPdbConnection;
+            _LOdbConnection = LOdbConnection;
             _logger = logger;
             _apiClient = apiClient;
             _orderReader = orderReader;
