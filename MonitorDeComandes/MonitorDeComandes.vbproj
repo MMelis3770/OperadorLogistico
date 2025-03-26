@@ -172,6 +172,7 @@
     <Compile Include="Classes\Initialize\SEI_CreateChartOfAccount.vb" />
     <Compile Include="Classes\Initialize\SEI_CreateCrystalMenus.vb" />
     <Compile Include="Classes\Initialize\SEI_CreateProcedures_Functions.vb" />
+    <Compile Include="Classes\Initialize\SEI_CreateTablesSL.vb" />
     <Compile Include="Classes\Useful\clsCrypto.vb" />
     <Compile Include="Classes\AddonBase\SEI_Addon.vb" />
     <Compile Include="Classes\AddonBase\SEI_Form.vb" />
