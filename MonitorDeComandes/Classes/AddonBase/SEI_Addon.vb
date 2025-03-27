@@ -49,7 +49,7 @@ Public MustInherit Class SEI_Addon
         '[PROGRAMAR]
         oFilter = oFilters.Add(SAPbouiCOM.BoEventTypes.et_ALL_EVENTS)
         oFilter.AddEx(SEI_AddonEnum.enAddonFormType.f_AddonSettings)
-        oFilter.AddEx(SEI_AddonEnum.enAddonFormType.f_MonitorComandes)
+        oFilter.AddEx(SEI_AddonEnum.enAddonFormType.f_OrdersMonitor)
 
         'SAP FORMS
         'oFilter.AddEx(SEI_AddonEnum.enSAPFormType.f_InterlocutoresComerciales)
@@ -128,6 +128,8 @@ Public MustInherit Class SEI_Addon
         Const cModulos As String = "43520"
         '
         Me.AddMenuItem("SEI_ConfigurarAddon", "8192", False, True, "", 11, "Configurar Add-on", SAPbouiCOM.BoMenuType.mt_STRING)
+        Me.AddMenuItem("8765", "43520", False, True, "", -1, "Integración Logística", SAPbouiCOM.BoMenuType.mt_POPUP)
+        Me.AddMenuItem("SEI_OrdersMonitor", "8765", False, True, "", -1, "Order Monitor", SAPbouiCOM.BoMenuType.mt_STRING)
         '
         'Menú Modelo:
 

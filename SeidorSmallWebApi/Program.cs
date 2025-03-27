@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Caching.Distributed;
 using SEIDOR_DecrypterLibrary;
 using SEIDOR_SLayer;
+using SeidorSmallWebApi.Controllers;
 using SeidorSmallWebApi.Extensions;
 using SeidorSmallWebApi.Filters;
+using SeidorSmallWebApi.Initialize;
 using System.Text.Json;
 
 // Create standard instance web application. Setup configuration automatically from appsettings
@@ -24,12 +26,16 @@ builder.Services.AddSingleton(sp => new SLConnection(
                    builder.Configuration.GetSection("ServiceLayer").GetValue<string>("userName"),
                    builder.Configuration.GetSection("ServiceLayer").GetValue<string>("password"),
                    builder.Configuration.GetSection("ServiceLayer").GetValue<int>("language")));
+
+builder.Services.AddScoped<SEI_CreateTablesSL>();
+builder.Services.AddControllers();
+builder.Services.AddScoped<SetupController>();
+
 builder.Services.AddTransient<ExceptionMiddleware>();
 
 // Configure Controllers
 builder.Services.ConfigureMvcBuilder();
 
-builder.Services.AddControllers();
 builder.Services.ConfigureIISIntegration();
 
 // Configure authentication for the controller methods.

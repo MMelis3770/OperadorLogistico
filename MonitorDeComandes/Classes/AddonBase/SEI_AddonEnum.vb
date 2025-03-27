@@ -142,12 +142,12 @@ Public Class SEI_AddonEnum
     Public Structure enAddonFormType
         ' FORMULARIOS USUARIO
         Const f_AddonSettings As String = "SEICONFIG"
-        Const f_MonitorComandes As String = "SEI_MonitorComandes"
+        Const f_OrdersMonitor As String = "SEIORDERSMONITOR"
     End Structure
     Public Structure enAddonMenus
         ' MENUS ADD-ON:
         Const ConfigurarAddon As String = "SEI_ConfigurarAddon"
-        Const MonitorComandes As String = "SEI_MonitorComandes"
+        Const OrdersMonitor As String = "SEI_OrdersMonitor"
 
     End Structure
 #End Region
