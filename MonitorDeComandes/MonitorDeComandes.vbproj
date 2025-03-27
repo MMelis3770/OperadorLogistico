@@ -163,6 +163,8 @@
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Classes\Entities\Order.vb" />
+    <Compile Include="Classes\Entities\OrderLines.vb" />
     <Compile Include="Classes\Entities\SERVICELAYER\BatchNumbers.vb" />
     <Compile Include="Classes\Entities\SERVICELAYER\DocMercancias.vb" />
     <Compile Include="Classes\Entities\SERVICELAYER\LineasMercancias.vb" />
