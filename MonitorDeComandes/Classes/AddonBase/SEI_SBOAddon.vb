@@ -176,9 +176,9 @@ Public Class SEI_SBOAddon
                 Select Case pVal.MenuUID.ToUpper
                     Case SEI_AddonEnum.enAddonMenus.ConfigurarAddon.ToUpper
                         Iniciar_Configuracion()
-                    Case SEI_AddonEnum.enAddonMenus.MonitorComandes.ToUpper
+                    Case SEI_AddonEnum.enAddonMenus.OrdersMonitor.ToUpper
                         Dim oForm As SEI_Form
-                        oForm = New SEI_MonitorComandes(Me)
+                        oForm = New SEI_OrdersMonitor(Me)
 
 
                     Case Else

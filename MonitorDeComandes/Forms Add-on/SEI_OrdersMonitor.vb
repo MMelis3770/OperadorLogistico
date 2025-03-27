@@ -8,7 +8,7 @@ Imports SAPbouiCOM
 Imports SEI.MonitorDeComandes.SEI_AddonEnum
 Imports SEIDOR_SLayer
 
-Public Class SEI_MonitorComandes
+Public Class SEI_OrdersMonitor
     Inherits SEI_Form
 
 #Region "ATRIBUTOS"
@@ -17,8 +17,9 @@ Public Class SEI_MonitorComandes
 
 #Region "CONSTANTES"
     Private Structure FormControls
-        Const grid As String = "gridComa"
-        Const DataTable As String = "dataTableComandes"
+        Const grid As String = "grid"
+        Const DataTable As String = "DT_Orders"
+        Const btnSend As String = "btOrders"
     End Structure
 
 
@@ -27,7 +28,7 @@ Public Class SEI_MonitorComandes
 #Region "CONSTRUCTOR"
     Public Sub New(ByRef parentaddon As SEI_Addon)
 
-        MyBase.New(parentaddon, enSBO_LoadFormTypes.XmlFile, enAddonFormType.f_MonitorComandes, enAddonMenus.MonitorComandes)
+        MyBase.New(parentaddon, enSBO_LoadFormTypes.XmlFile, enAddonFormType.f_OrdersMonitor, enAddonMenus.OrdersMonitor)
 
         Me.Initialize()
 
@@ -58,10 +59,7 @@ Public Class SEI_MonitorComandes
                 Select Case pVal.ItemUID
                     'Case FormControls.grid
                     '    HandleGridEvents(pVal, BubbleEvent)
-                    'Case FormControls.btnCargar
-                    '    HandleBtnCargar(pVal, BubbleEvent)
-                    'Case FormControls.comboProveedor
-                    '    ComboProveedor_COMBO_SELECT(pVal, BubbleEvent)
+
                 End Select
             End If
         Catch ex As Exception
@@ -108,11 +106,18 @@ Public Class SEI_MonitorComandes
 
     Private Sub LoadOrdersDataInGrid()
         Try
+            Dim oCombo As SAPbouiCOM.ComboBox = CType(Me.Form.Items.Item("cbOrder").Specific, SAPbouiCOM.ComboBox)
+            oCombo.Select("ALL", SAPbouiCOM.BoSearchKey.psk_ByValue)
 
             Dim oDataTable As SAPbouiCOM.DataTable = Me.Form.DataSources.DataTables.Item(FormControls.DataTable)
 
 
-            Dim query As String = 
+            Dim query As String = $"SELECT '' AS Send, T0.DocEntry,T0.DocNum as Document,T0.DocTotal AS DocTotal,T1.SlpName AS SalesEmployee,T0.DocDate As Date,T0.DocDueDate AS DueDate,T0.CardCode AS Client,T0.CardName AS ClientName,T2.DocEntry AS Invoice,'' AS OrderStatus,'' AS OperatorStatus
+                                    FROM ORDR T0
+                                    INNER JOIN OSLP T1 on T0.SlpCode = T1.SlpCode
+                                    LEFT JOIN INV1 T3 on T0.DocEntry = T3.BaseEntry
+                                    LEFT JOIN OINV T2 on T3.DocEntry = T2.DocEntry
+                                    GROUP BY T0.DocEntry,T0.DocNum ,T0.DocTotal ,T1.SlpName ,T0.DocDate,T0.DocDueDate,T0.CardCode ,T0.CardName ,T2.DocEntry,T0.DocStatus"
 
 
             oDataTable.ExecuteQuery(query)
@@ -128,14 +133,79 @@ Public Class SEI_MonitorComandes
                 rowHeaders.SetText(i, (i + 1).ToString())
             Next
 
-            'ConfigurateGridOfOrders(grid)
+            ConfigurateGridOfOrders(grid)
 
         Catch ex As Exception
             Throw New Exception("LoadOrdersDataInGrid() > " & ex.Message)
         End Try
     End Sub
 
+    Private Sub ConfigurateGridOfOrders(grid As SAPbouiCOM.Grid)
 
+        Dim xmlDoc = XDocument.Parse(grid.DataTable.SerializeAsXML(SAPbouiCOM.BoDataTableXmlSelect.dxs_All))
+
+        Dim xmlColumns = xmlDoc.Descendants("Column")
+
+        For Each column In xmlColumns
+            Dim uid As String = column.Attribute("Uid").Value
+
+            If (uid = "Send") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Send"
+                grid.Columns.Item(uid).Type = SAPbouiCOM.BoGridColumnType.gct_CheckBox
+                grid.Columns.Item(uid).Editable = True
+            End If
+
+            If (uid = "DocEntry") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "DocEntry"
+                grid.Columns.Item(uid).LinkedObjectType = SAPbobsCOM.BoObjectTypes.oOrders
+            End If
+
+            If (uid = "Document") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Document"
+            End If
+
+            If (uid = "DocTotal") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Document Total"
+            End If
+
+            If (uid = "SalesEmployee") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Sales Employee"
+            End If
+
+            If (uid = "Invoice") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Invoice"
+            End If
+
+            If (uid = "Date") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Date"
+            End If
+
+            If (uid = "DueDate") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Due Date"
+            End If
+
+            If (uid = "Client") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Client"
+            End If
+
+            If (uid = "ClientName") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Client Name"
+            End If
+
+            If (uid = "OrderStatus") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Order Status"
+            End If
+
+            If (uid = "OperatorStatus") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Operator Status"
+            End If
+        Next
+        grid.DataTable.LoadSerializedXML(SAPbouiCOM.BoDataTableXmlSelect.dxs_DataOnly, xmlDoc.ToString())
+        For i = 0 To grid.Rows.Count - 1
+            grid.CommonSetting.SetRowBackColor(i + 1, -1)
+        Next
+        grid.AutoResizeColumns()
+    End Sub
 
 
 
