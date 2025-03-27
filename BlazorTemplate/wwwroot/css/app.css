@@ -16,6 +16,10 @@ h1:focus {
     display: none;
 }
 
+.mi-clase-personalizada {
+    background-color: red; /* Prueba con un color llamativo */
+}
+
 .main {
     min-height: calc(100dvh - 86px);
     color: var(--neutral-foreground-rest);

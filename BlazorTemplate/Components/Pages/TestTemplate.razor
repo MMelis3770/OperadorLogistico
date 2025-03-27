@@ -1,35 +1,187 @@
 ﻿@using System.Text.Json
 @using Newtonsoft.Json.Linq
 @using System.Reflection
+@using System.IO
+@using BlazorTemplate.Models
+@using BlazorTemplate.Interfaces
+@using Microsoft.FluentUI.AspNetCore.Components
 @inject IDialogService _dialogService
-
+@inject IOrderService _orderService
 @page "/TestTemplate"
-<PageTitle><h1>Template</h1></PageTitle>
+@implements IDisposable
 
-<h1>Template</h1>
+<PageTitle>Orders</PageTitle>
+<h1>Orders</h1>
 
-<FluentDataGrid Items="@people" TGridItem="Person" OnRowClick="@HandleRowClick">
-    <PropertyColumn Property="@(p => p.PersonId)" Sortable="true" />
-    <PropertyColumn Property="@(p => p.Name)" Sortable="true" />
-    <PropertyColumn Property="@(p => p.BirthDate)" Format="yyyy-MM-dd" Sortable="true" />
+<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
+    <FluentButton Appearance="Appearance.Accent" OnClick="@LoadOrdersFromFiles">Cargar Comandas</FluentButton>
+    @if (isLoading)
+    {
+        <FluentProgressRing />
+        <span>Cargando comandas...</span>
+    }
+</FluentStack>
+
+<FluentDataGrid Items="@orders" TGridItem="Order" style="height: 600px" Pagination="@pagination">
+    <PropertyColumn Property="@(o => o.ID)" Sortable="true" />
+    <PropertyColumn Property="@(o => o.Client)" Sortable="true" />
+    <PropertyColumn Property="@(o => o.Date)" Format="yyyy-MM-dd" Sortable="true" />
+    <PropertyColumn Property="@(o => o.Expiration)" Format="yyyy-MM-dd" Sortable="true" />
+    <TemplateColumn Title="Líneas">
+        <ChildContent>
+            <div>@context.LineCount líneas</div>
+        </ChildContent>
+    </TemplateColumn>
 </FluentDataGrid>
 
+<FluentPaginator State="@pagination" />
+
+@if (selectedOrder != null)
+{
+    <h2>Detalle de Comanda: @selectedOrder.ID</h2>
+    <FluentDataGrid Items="@selectedOrderItems" TGridItem="OrderLineItem">
+        <PropertyColumn Property="@(li => li.LineNumber)" Title="Línea" Sortable="true" />
+        <PropertyColumn Property="@(li => li.ItemCode)" Title="Artículo" Sortable="true" />
+        <PropertyColumn Property="@(li => li.Quantity)" Title="Cantidad" Sortable="true" />
+    </FluentDataGrid>
+
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" Style="margin-top: 16px;">
+        <FluentButton Appearance="Appearance.Accent" OnClick="@(() => ConfirmOrderToSAP(selectedOrder.ID))">
+            Confirmar en SAP
+        </FluentButton>
+    </FluentStack>
+}
+
 @code {
-    record Person(int PersonId, string Name, DateOnly BirthDate);
+    record Order(int ID, string Client, DateOnly Date, DateOnly Expiration, int LineCount);
+    record OrderLineItem(int LineNumber, string ItemCode, int Quantity);
 
-    IQueryable<Person> people = new[]
+    private PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+    private IQueryable<Order> orders;
+    private List<OrderData> processedOrders = new List<OrderData>();
+    private Order selectedOrder;
+    private IQueryable<OrderLineItem> selectedOrderItems;
+    private System.Threading.Timer refreshTimer;
+    private bool isLoading = false;
+
+    protected override void OnInitialized()
     {
-        new Person(10895, "Jean Martin", new DateOnly(1985, 3, 16)),
-        new Person(10944, "António Langa", new DateOnly(1991, 12, 1)),
-        new Person(11203, "Julie Smith", new DateOnly(1958, 10, 10)),
-        new Person(11205, "Nur Sari", new DateOnly(1922, 4, 27)),
-        new Person(11898, "Jose Hernandez", new DateOnly(2011, 5, 3)),
-        new Person(12130, "Kenji Sato", new DateOnly(2004, 1, 9)),
-    }.AsQueryable();
+        // Set up initial data
+        orders = new[]
+        {
+            new Order(10895, "Jean Martin", new DateOnly(1985, 3, 16), new DateOnly(2019, 2, 16), 0),
+            new Order(10944, "António Langa", new DateOnly(1991, 12, 1), new DateOnly(2020, 2, 16), 0),
+            new Order(11203, "Julie Smith", new DateOnly(1958, 10, 10), new DateOnly(2021, 2, 16), 0),
+            new Order(11205, "Nur Sari", new DateOnly(1922, 4, 27), new DateOnly(2022, 2, 16), 0),
+            new Order(11898, "Jose Hernandez", new DateOnly(2011, 5, 3), new DateOnly(2023, 2, 16), 0),
+            new Order(12130, "Kenji Sato", new DateOnly(2004, 1, 9), new DateOnly(2024, 2, 16), 0),
+        }.AsQueryable();
 
-    private void HandleRowClick(FluentDataGridRow<Person> row)
+        // Set up a timer to check for new files every 60 seconds
+        refreshTimer = new System.Threading.Timer(_ =>
+        {
+            InvokeAsync(async () =>
+            {
+                await LoadOrdersFromFiles();
+                StateHasChanged();
+            });
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(60));
+    }
+
+    private async Task LoadOrdersFromFiles()
+    {
+        if (isLoading) return;
+
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            // Use the OrderService to get orders
+            processedOrders = await _orderService.GetOrdersAsync();
+
+            // Convert the processed orders to the format expected by the grid
+            var orderList = processedOrders.Select(o => new Order(
+                o.ID,
+                o.Client,
+                DateOnly.FromDateTime(o.OrderDate),
+                DateOnly.FromDateTime(o.DueDate),
+                o.LineItems.Count
+            )).ToList();
+
+            // Combine with existing orders, avoiding duplicates
+            var existingIds = orders.Select(o => o.ID).ToHashSet();
+            var newOrders = orderList.Where(o => !existingIds.Contains(o.ID)).ToList();
+
+            if (newOrders.Any())
+            {
+                orders = orders.Concat(newOrders.AsQueryable()).OrderBy(o => o.ID);
+                await _dialogService.ShowInfoAsync($"Se han cargado {newOrders.Count} nuevas comandas.", "Información");
+            }
+            else
+            {
+                await _dialogService.ShowInfoAsync("No se han encontrado nuevas comandas.", "Información");
+            }
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowErrorAsync($"Error al cargar comandas: {ex.Message}", "Error");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void HandleRowClick(FluentDataGridRow<Order> row)
     {
         if (row.Item is null) return;
-        _dialogService.ShowInfo(row.Item.Name);
+
+        selectedOrder = row.Item;
+
+        // Find the corresponding processed order data
+        var orderData = processedOrders.FirstOrDefault(o => o.ID == selectedOrder.ID);
+
+        if (orderData != null)
+        {
+            selectedOrderItems = orderData.LineItems
+                .Select(li => new OrderLineItem(
+                    li.LineNumber,
+                    li.ItemCode,
+                    li.Quantity
+                ))
+                .AsQueryable();
+        }
+        else
+        {
+            selectedOrderItems = Array.Empty<OrderLineItem>().AsQueryable();
+        }
+    }
+
+    private async Task ConfirmOrderToSAP(int orderId)
+    {
+        try
+        {
+            bool result = await _orderService.ConfirmOrderToSAP(orderId);
+
+            if (result)
+            {
+                await _dialogService.ShowInfoAsync($"Orden {orderId} confirmada en SAP con éxito.", "Confirmación");
+            }
+            else
+            {
+                await _dialogService.ShowErrorAsync($"No se pudo confirmar la orden {orderId} en SAP.", "Error");
+            }
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowErrorAsync($"Error al confirmar la orden en SAP: {ex.Message}", "Error");
+        }
+    }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
     }
 }

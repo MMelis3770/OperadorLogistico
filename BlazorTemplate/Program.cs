@@ -1,3 +1,5 @@
+using BlazorTemplate.Interfaces;
+using BlazorTemplate.Services;
 using BlazorTemplateService;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,9 +11,6 @@ namespace BlazorTemplate;
 
 internal static class Program
 {
-    /// <summary>
-    ///  The main entry point for the application.
-    /// </summary>
     [STAThread]
     static void Main()
     {
@@ -38,13 +37,16 @@ internal static class Program
             {
                 services.AddWindowsFormsBlazorWebView();
                 services.AddFluentUIComponents();
-
                 services.AddPluginRepositories(context.Configuration);
                 services.AddSingleton<BlazorForm>();
-                //services.Configure<FormOptions>(options =>
-                //{
-                //    options.MultipartBodyLengthLimit = 524288000; // 500 MB
-                //});
+
+                string orderFilesPath = @"C:\Users\mmelis\OneDrive - SEIDOR SOLUTIONS S.L\Escritorio";
+                services.AddSingleton<IOrderService>(provider =>
+                    new OrderService(
+                        provider.GetRequiredService<ILogger<OrderService>>(),
+                        orderFilesPath
+                    )
+                );
             })
             .ConfigureLogging((context, logging) =>
             {
