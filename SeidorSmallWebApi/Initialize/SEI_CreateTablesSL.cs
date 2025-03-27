@@ -94,8 +94,6 @@ namespace SeidorSmallWebApi.Initialize
             await CreateUserField(tableName, "Quantity", "Quantity", BoFieldTypes.db_Float, 10,
                 BoFldSubTypes.st_Quantity);
             await CreateUserField(tableName, "LotNumber", "Lot Number", BoFieldTypes.db_Alpha, 50);
-            await CreateUserField(tableName, "WhsCode", "Warehouse", BoFieldTypes.db_Alpha, 8,
-                BoFldSubTypes.st_None, "OWHS");
             await CreateUserField(tableName, "LineStatus", "Line Status", BoFieldTypes.db_Alpha, 20,
                 validValues: new[] { "Pending", "Confirmed", "Error" });
             await CreateUserField(tableName, "ErrorMsg", "Line Error", BoFieldTypes.db_Alpha, 254);
