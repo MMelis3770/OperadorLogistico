@@ -1,5 +1,8 @@
 - Add some validations to the products and Inventory.
-- Add batches to the masters to load
+	- Batch Validations:
+		- ItemCode  --> Look if the ItemCode exist on the database DONE
+		- IsBlocked --> Look why a batch could be blocked(ExpirationDate, Quantity...) DONE
+
 
 DB
 
