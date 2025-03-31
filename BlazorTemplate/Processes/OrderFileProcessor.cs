@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using BlazorTemplate.Models;
+﻿using BlazorTemplate.Models;
 
 namespace BlazorTemplate.Processes
 {
@@ -68,7 +63,7 @@ namespace BlazorTemplate.Processes
                             ID = int.Parse(parts[1]),
                             Client = parts[2],
                             OrderDate = DateTime.Parse(parts[3]),
-                            DueDate = DateTime.Parse(parts[3])
+                            DueDate = DateTime.Parse(parts[4])
                         };
                     }
                     else if (parts[0] == "LINE" && currentOrder != null)

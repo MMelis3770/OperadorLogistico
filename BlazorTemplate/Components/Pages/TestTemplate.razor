@@ -10,11 +10,12 @@
 @page "/TestTemplate"
 @implements IDisposable
 
-<PageTitle>Orders</PageTitle>
-<h1>Orders</h1>
+<PageTitle>Order Management</PageTitle>
+<h1>Order Management</h1>
 
 <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
     <FluentButton Appearance="Appearance.Accent" OnClick="@LoadOrdersFromFiles">Cargar Comandas</FluentButton>
+    <FluentButton Appearance="Appearance.Accent">Subir Comandas</FluentButton>
     @if (isLoading)
     {
         <FluentProgressRing />
@@ -22,14 +23,23 @@
     }
 </FluentStack>
 
-<FluentDataGrid Items="@orders" TGridItem="Order" style="height: 600px" Pagination="@pagination">
+<FluentDataGrid Items="@orders" TGridItem="Order" style="height: 600px" Pagination="@pagination" RowClicked="HandleRowClick">
     <PropertyColumn Property="@(o => o.ID)" Sortable="true" />
     <PropertyColumn Property="@(o => o.Client)" Sortable="true" />
     <PropertyColumn Property="@(o => o.Date)" Format="yyyy-MM-dd" Sortable="true" />
     <PropertyColumn Property="@(o => o.Expiration)" Format="yyyy-MM-dd" Sortable="true" />
-    <TemplateColumn Title="Líneas">
+    <TemplateColumn Title="">
         <ChildContent>
-            <div>@context.LineCount líneas</div>
+            <div @onclick="@(() => ToggleCheckedState(context.ID))" @onclick:stopPropagation="true" style="cursor: pointer;">
+                @if (IsOrderChecked(context.ID))
+                {
+                    <FluentIcon Value="@(new Icons.Regular.Size24.CheckboxChecked())" Color="Color.Accent" />
+                }
+                else
+                {
+                    <FluentIcon Value="@(new Icons.Regular.Size24.CheckboxUnchecked())" Color="Color.Accent" />
+                }
+            </div>
         </ChildContent>
     </TemplateColumn>
 </FluentDataGrid>
@@ -64,6 +74,9 @@
     private System.Threading.Timer refreshTimer;
     private bool isLoading = false;
 
+    // Dictionary to track checked state for each order
+    private Dictionary<int, bool> checkedOrders = new Dictionary<int, bool>();
+
     protected override void OnInitialized()
     {
         // Set up initial data
@@ -77,15 +90,41 @@
             new Order(12130, "Kenji Sato", new DateOnly(2004, 1, 9), new DateOnly(2024, 2, 16), 0),
         }.AsQueryable();
 
-        // Set up a timer to check for new files every 60 seconds
-        refreshTimer = new System.Threading.Timer(_ =>
+        // Initialize all orders as unchecked
+        foreach (var order in orders)
         {
-            InvokeAsync(async () =>
-            {
-                await LoadOrdersFromFiles();
-                StateHasChanged();
-            });
-        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(60));
+            checkedOrders[order.ID] = false;
+        }
+
+        // Set up a timer to check for new files every 60 seconds
+        // refreshTimer = new System.Threading.Timer(_ =>
+        // {
+        //     InvokeAsync(async () =>
+        //     {
+        //         await LoadOrdersFromFiles();
+        //         StateHasChanged();
+        //     });
+        // }, null, TimeSpan.Zero, TimeSpan.FromSeconds(60));
+    }
+
+    // Method to check if an order is checked
+    private bool IsOrderChecked(int orderId)
+    {
+        return checkedOrders.ContainsKey(orderId) && checkedOrders[orderId];
+    }
+
+    // Method to toggle the checked state
+    private void ToggleCheckedState(int orderId)
+    {
+        if (checkedOrders.ContainsKey(orderId))
+        {
+            checkedOrders[orderId] = !checkedOrders[orderId];
+        }
+        else
+        {
+            checkedOrders[orderId] = true;
+        }
+        StateHasChanged();
     }
 
     private async Task LoadOrdersFromFiles()
@@ -116,6 +155,13 @@
             if (newOrders.Any())
             {
                 orders = orders.Concat(newOrders.AsQueryable()).OrderBy(o => o.ID);
+
+                // Initialize new orders as unchecked
+                foreach (var order in newOrders)
+                {
+                    checkedOrders[order.ID] = false;
+                }
+
                 await _dialogService.ShowInfoAsync($"Se han cargado {newOrders.Count} nuevas comandas.", "Información");
             }
             else
