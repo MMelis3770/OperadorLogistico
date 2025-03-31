@@ -1,23 +1,18 @@
-﻿Option Explicit On
-
-Imports System.Collections.Generic
-<<<<<<< HEAD
+﻿Imports System.Collections.Generic
 Imports System.Data
-Imports System.IO
-=======
 Imports System.IO
 Imports System.Linq
 Imports System.Net.Http
 Imports System.Threading.Tasks
->>>>>>> ADD THE FILTER
 Imports System.Xml.Linq
 Imports CrystalDecisions.CrystalReports.Engine
 Imports Newtonsoft.Json.Linq
 Imports SAPbobsCOM
 Imports SAPbouiCOM
 Imports SEI.MonitorDeComandes.SEI_AddonEnum
-
+Imports SEIDOR_SLayer
 Public Class SEI_OrdersMonitor
+
     Inherits SEI_Form
 
 #Region "ATRIBUTOS"
@@ -70,13 +65,8 @@ Public Class SEI_OrdersMonitor
             If Trim(pVal.ItemUID) <> "" Then
                 'Eventos de Controles o Items de Formulario
                 Select Case pVal.ItemUID
-<<<<<<< HEAD
-                    'Case FormControls.grid
-                    '    HandleGridEvents(pVal, BubbleEvent)
                     Case FormControls.btnSend
                         HandleBtnSend(pVal, BubbleEvent)
-
-=======
                     Case FormControls.btnSend
                         HandleBtnSend(pVal, BubbleEvent)
                     Case FormControls.btnCreateInvoice
@@ -85,7 +75,6 @@ Public Class SEI_OrdersMonitor
                         HandleBtnCreateDeliveries(pVal, BubbleEvent)
                     Case FormControls.btnFilter
                         HandleBtnFilter(pVal, BubbleEvent)
->>>>>>> ADD THE FILTER
                 End Select
             End If
         Catch ex As Exception
@@ -113,98 +102,6 @@ Public Class SEI_OrdersMonitor
 #End Region
 
 #Region "FUNCIONES FORM"
-    Private Sub HandleBtnSend(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
-        Try
-            If pVal.EventType = BoEventTypes.et_ITEM_PRESSED AndAlso pVal.BeforeAction = False Then
-
-                Dim selectedOrders As List(Of Order) = GetSelectedOrders()
-
-                Dim filePath As String = "C:\Users\mcorder\OneDrive - SEIDOR SOLUTIONS S.L\PFG\DataTxt\Data_" & DateTime.Now.ToString("yyyyMMdd_HHmm") & ".txt"
-                GenerateOrderTxt(selectedOrders, filePath)
-
-                SBO_Application.StatusBar.SetText($"File generat correctament a {filePath}",
-                    BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
-            End If
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText($"Error en generar fitxer: {ex.Message}",
-                BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-            BubbleEvent = False
-        End Try
-    End Sub
-
-    Public Sub GenerateOrderTxt(selectedOrders As List(Of Order), filePath As String)
-        If selectedOrders.Count = 0 Then
-            SBO_Application.StatusBar.SetText("No orders to export.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Warning)
-            Exit Sub
-        End If
-
-        Try
-            Dim directoryPath As String = Path.GetDirectoryName(filePath)
-            If Not Directory.Exists(directoryPath) Then
-                Directory.CreateDirectory(directoryPath)
-            End If
-
-            Using writer As New StreamWriter(filePath)
-                writer.WriteLine("HEADER|DocEntry|CardCode|OrderDate|DocDueDate")
-                writer.WriteLine("LINE|DocEntry|LineNum|ItemCode|Quantity|DueDate")
-
-                For Each order In selectedOrders
-                    writer.WriteLine($"HEADER|{order.DocEntry}|{order.CardCode}|{order.OrderDate:yyyy-MM-dd}|{order.DocDueDate:yyyy-MM-dd}")
-
-                    For Each line In order.Lines
-                        writer.WriteLine($"LINE|{order.DocEntry}|{line.LineNum}|{line.ItemCode}|{line.Quantity}|{line.DueDate:yyyy-MM-dd}")
-                    Next
-                Next
-            End Using
-
-            SBO_Application.StatusBar.SetText($"File generated successfully at {filePath}",
-            BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText($"Error en generar fitxer: {ex.Message}",
-                BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-        End Try
-    End Sub
-
-
-    Private Function GetSelectedOrders() As List(Of Order)
-        Dim orders As New List(Of Order)()
-        Dim grid As Grid = CType(Form.Items.Item(FormControls.grid).Specific, Grid)
-        Dim dataTable As SAPbouiCOM.DataTable = Form.DataSources.DataTables.Item(FormControls.DataTable)
-
-        Dim selectedDocEntries As New HashSet(Of Integer)
-
-        For i As Integer = 0 To dataTable.Rows.Count - 1
-            If CInt(dataTable.GetValue("Send", i)) = 1 Then
-                selectedDocEntries.Add(CInt(dataTable.GetValue("DocEntry", i)))
-            End If
-        Next
-
-        For Each docEntry In selectedDocEntries
-            Dim order As New Order() With {
-            .DocEntry = docEntry,
-            .CardCode = dataTable.GetValue("CardCode", 0).ToString(),
-            .OrderDate = CDate(dataTable.GetValue("DocDate", 0)),
-            .DocDueDate = CDate(dataTable.GetValue("DocDueDate", 0)),
-            .Lines = New List(Of OrderLines)()
-        }
-
-            For i As Integer = 0 To dataTable.Rows.Count - 1
-                If CInt(dataTable.GetValue("DocEntry", i)) = docEntry Then
-                    order.Lines.Add(New OrderLines With {
-                    .LineNum = CInt(dataTable.GetValue("LineNum", i)),
-                    .ItemCode = dataTable.GetValue("ItemCode", i).ToString(),
-                    .Quantity = CDbl(dataTable.GetValue("Quantity", i)),
-                    .DueDate = CDate(dataTable.GetValue("DueDate", i))
-                })
-                End If
-            Next
-
-            orders.Add(order)
-        Next
-
-        Return orders
-    End Function
-
 
 #End Region
 
@@ -214,8 +111,6 @@ Public Class SEI_OrdersMonitor
 #End Region
 #Region "HANDLERS"
 
-<<<<<<< HEAD
-=======
     Private Sub HandleBtnFilter(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
 
         If pVal.EventType <> BoEventTypes.et_ITEM_PRESSED Then Exit Sub
@@ -243,7 +138,11 @@ Public Class SEI_OrdersMonitor
 
 
             If orderStatus <> "All" AndAlso orderStatus <> "" Then
-                query &= " AND T0.U_OrdersStatus = '" & orderStatus & "'"
+                If orderStatus = "Pending" Then
+                    query &= " AND T0.U_OrdersStatus IS NULL"
+                Else
+                    query &= " AND T0.U_OrdersStatus = '" & orderStatus & "'"
+                End If
             End If
 
             If operatorStatus <> "" Then
@@ -394,7 +293,6 @@ Public Class SEI_OrdersMonitor
 
         End If
     End Sub
->>>>>>> ADD THE FILTER
 #End Region
 
 #Region "FUINCIONES GENERALES"
@@ -591,4 +489,5 @@ Public Class SEI_OrdersMonitor
 
 #End Region
 #End Region
+
 End Class

@@ -12,11 +12,11 @@ Public Class SEI_CreateTablesSL
 
     Private Async Function CreateUserDefinedField() As Threading.Tasks.Task
 
-        Await CreateUserDataField("ORDR", "OrdersStatus", "OrdersStatus", BoFieldTypes.db_Alpha, 50, "Pending")
-        Await CreateUserDataField("ORDR", "OperatorStatus", "OrdersStatus", BoFieldTypes.db_Alpha, 50)
+        Await CreateUserDataField("ORDR", "OrdersStatus", "OrdersStatus", BoFieldTypes.db_Alpha, 50)
+        Await CreateUserDataField("ORDR", "OperatorStatus", "OperatorStatus", BoFieldTypes.db_Alpha, 50)
     End Function
 
-    Private Async Function CreateUserDataField(table As String, field As String, description As String, type As BoFieldTypes, Optional size As Integer = 0, Optional defaultValue As String = "") As Task
+    Private Async Function CreateUserDataField(table As String, field As String, description As String, type As BoFieldTypes, Optional size As Integer = 0) As Task
         Try
             Dim response = Await m_SBOAddon.oSLConnection.Request("UserFieldsMD").Filter($"TableName eq '{table}' and Name eq '{field}'").GetAllAsync(Of JObject)()
             If response.Count = 0 Then
@@ -25,8 +25,7 @@ Public Class SEI_CreateTablesSL
                     Key .Name = field,
                     Key .Description = description,
                     Key .Type = type.ToString(),
-                    Key .EditSize = If(size <> 0, CType(size, Integer?), CType(Nothing, Integer?)),
-                    Key .DefaultValue = If(String.IsNullOrEmpty(defaultValue), CType(Nothing, String), defaultValue)
+                    Key .EditSize = If(size <> 0, CType(size, Integer?), CType(Nothing, Integer?))
                 }
 
                 Await m_SBOAddon.oSLConnection.Request("UserFieldsMD").PostAsync(userField)
