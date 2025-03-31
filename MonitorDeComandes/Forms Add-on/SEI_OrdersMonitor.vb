@@ -67,8 +67,6 @@ Public Class SEI_OrdersMonitor
                 Select Case pVal.ItemUID
                     Case FormControls.btnSend
                         HandleBtnSend(pVal, BubbleEvent)
-                    Case FormControls.btnSend
-                        HandleBtnSend(pVal, BubbleEvent)
                     Case FormControls.btnCreateInvoice
                         HandleBtnCreateInvoices(pVal, BubbleEvent)
                     Case FormControls.btnCreateDelivery
@@ -174,7 +172,6 @@ Public Class SEI_OrdersMonitor
 
         End If
     End Sub
-
 
     Private Sub HandleBtnSend(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
         If pVal.EventType <> BoEventTypes.et_ITEM_PRESSED Then Exit Sub
@@ -397,7 +394,7 @@ Public Class SEI_OrdersMonitor
                 writer.WriteLine($"HEADER|{order.DocEntry}|{order.CardCode}|{order.OrderDate:yyyy-MM-dd}|{order.DocDueDate:yyyy-MM-dd}")
 
                 For Each line In order.Lines
-                    writer.WriteLine($"LINE|{order.DocEntry}|{line.LineNum}|{line.ItemCode}|{line.Quantity}|{line.DueDate:yyyy-MM-dd}")
+                    writer.WriteLine($"LINE|{order.DocEntry}|{line.LineNum}|{line.ItemCode}|{line.Quantity}")
                 Next
             End Using
         Catch ex As Exception
