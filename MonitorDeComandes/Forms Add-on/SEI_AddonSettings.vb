@@ -223,6 +223,7 @@ Public Class SEI_AddonSettings
     End Sub
     Public Sub CreateTables()
         Dim oCreateTables As SEI_CreateTables
+        Dim oCreateTablesSL As SEI_CreateTablesSL
         Dim oCreateFormatQuerys As SEI_AddingFormatedQueries
         Dim oPermissions As SEI_AddingPermissions
         'Dim oSQL As SEI_SQL
@@ -233,6 +234,9 @@ Public Class SEI_AddonSettings
         End If
         '
         Me.m_ParentAddon.Get_AddonSettings(Me.SBO_Company)
+
+        oCreateTablesSL = New SEI_CreateTablesSL()
+        oCreateTablesSL.AddUserTablesSL().Wait()
 
         'oCreateTables = New SEI_CreateTables(SubMain.m_SBOAddon)
         'oCreateTables.AddUserTables()
