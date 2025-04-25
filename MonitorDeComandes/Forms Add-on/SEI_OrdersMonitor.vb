@@ -271,7 +271,11 @@ Public Class SEI_OrdersMonitor
 
                     If sendChecked = "Y" And operatorStatus = "C" Then
                         isOrderSelected = True
-                        'Do post delivery
+                        'Do post delivery. Fer el post de totes les deliveries marcades com a chek si
+                        'una esta mal i les altres no, com actuem?
+                        'Si ha anat be patchorder tal i com esta, sino cridem la funcio pero
+                        'posatn no deliverered sino una altre cosa
+                        'Un cop els deliveries esitiguin fets com o marco perque la noura sapiga que ja pot fer les entregues?
                         PatchOrder(docEntry, "Delivered").Wait()
                     ElseIf sendChecked = "Y" And operatorStatus <> "C" Then
                         SBO_Application.StatusBar.SetText("You cannot create a delivery, the order is not confirmed.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)

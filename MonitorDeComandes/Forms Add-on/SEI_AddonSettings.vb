@@ -222,10 +222,10 @@ Public Class SEI_AddonSettings
         End If
     End Sub
     Public Sub CreateTables()
-        Dim oCreateTables As SEI_CreateTables
         Dim oCreateTablesSL As SEI_CreateTablesSL
-        Dim oCreateFormatQuerys As SEI_AddingFormatedQueries
-        Dim oPermissions As SEI_AddingPermissions
+
+        'Dim oCreateFormatQuerys As SEI_AddingFormatedQueries
+        'Dim oPermissions As SEI_AddingPermissions
         'Dim oSQL As SEI_SQL
         'Dim oCreateCR As SEI_CreateCrystalMenus
 
@@ -235,8 +235,8 @@ Public Class SEI_AddonSettings
         '
         Me.m_ParentAddon.Get_AddonSettings(Me.SBO_Company)
 
-        oCreateTablesSL = New SEI_CreateTablesSL()
-        oCreateTablesSL.AddUserTablesSL().Wait()
+        oCreateTablesSL = New SEI_CreateTablesSL(Me.m_ParentAddon)
+        oCreateTablesSL.AddUserTables().Wait()
 
         'oCreateTables = New SEI_CreateTables(SubMain.m_SBOAddon)
         'oCreateTables.AddUserTables()
