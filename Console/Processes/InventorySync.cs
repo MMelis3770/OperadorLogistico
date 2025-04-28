@@ -1,4 +1,5 @@
 ﻿using B1SLayer;
+using Console.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using OperadorLogistico.Console;
@@ -13,9 +14,24 @@ namespace Console.Processes
         private readonly ILogisticOperatorDatabaseConnection _LOdbConnection;
         private readonly IConfiguration _configuration;
         private readonly ILogger<InventorySync> _logger;
+
         private readonly Dictionary<Product, bool> _inventory;
+        private readonly Dictionary<Product, bool> _inventoryLO;
+        private readonly Dictionary<Product, bool> _inventoryToUpdate;
+        private readonly Dictionary<Product, bool> _inventoryToDelete;
+
         private readonly Dictionary<Batch, bool> _batches;
+        private readonly Dictionary<Batch, bool> _batchesLO;
+        private readonly Dictionary<Batch, bool> _batchesToUpdate;
+        private readonly Dictionary<Batch, bool> _batchesToDelete;
+
+        private readonly Dictionary<Client, bool> _clients;
+        private readonly Dictionary<Client, bool> _clientsLO;
+        private readonly Dictionary<Client, bool> _clientsToUpdate;
+        private readonly Dictionary<Client, bool> _clientsToDelete;
+
         private int _ErrorCount;
+
         public InventorySync(
             IConfiguration configuration,
             SLConnection slConnection,
@@ -28,125 +44,392 @@ namespace Console.Processes
             _SAPdbConnection = SAPdbConnection;
             _LOdbConnection = LOdbConnection;
             _logger = logger;
+
+            // Inventory dictionaries
             _inventory = new Dictionary<Product, bool>();
+            _inventoryLO = new Dictionary<Product, bool>();
+            _inventoryToUpdate = new Dictionary<Product, bool>();
+            _inventoryToDelete = new Dictionary<Product, bool>();
+
+            // Batches dictionaries
             _batches = new Dictionary<Batch, bool>();
+            _batchesLO = new Dictionary<Batch, bool>();
+            _batchesToUpdate = new Dictionary<Batch, bool>();
+            _batchesToDelete = new Dictionary<Batch, bool>();
+
+            // Clients dictionaries
+            _clients = new Dictionary<Client, bool>();
+            _clientsLO = new Dictionary<Client, bool>();
+            _clientsToUpdate = new Dictionary<Client, bool>();
+            _clientsToDelete = new Dictionary<Client, bool>();
+
             _ErrorCount = 0;
         }
+
         public void Execute()
         {
-            GetInventory();
-            SetInventory();
-            GetBatches();
-            ValidateBatches();
-            SetBatches();
-
-        }
-        private void GetInventory()
-        {
-            //Select to get all the products in SAP
-            string InventoryQuery = "SELECT ItemCode, ItemName, OnHand, UnitPrice FROM OITM Where OnHand < 0";
-            var inventory = _SAPdbConnection.Query<Product>(InventoryQuery);
-            foreach (Product product in inventory)
+            GetClientDifferences();
+            if ( _clientsToUpdate.Count > 0 || _clientsToDelete.Count > 0)
             {
-                if (product != null)
+                SetClients();
+            }
+            GetInventoryDifferences();
+            if (_inventoryToUpdate.Count > 0 || _inventoryToDelete.Count > 0)
+            {
+                SetInventory();
+            }
+            GetBatchDifferences();
+            if (_batchesToUpdate.Count > 0 || _batchesToDelete.Count > 0)
+            {
+                SetBatches();
+            }
+        }
+
+        private void GetClientDifferences()
+        {
+            GetClientsSAP();
+            GetClientsLO();
+            ProcessClientDifferences();
+        }
+        private void GetInventoryDifferences()
+        {
+            GetInventorySAP();
+            GetInventoryLO();
+            ProcessInventoryDifferences();
+        }
+        private void GetBatchDifferences()
+        {
+            GetBatchesSAP();
+            GetBatchesLO();
+            ProcessBatchDifferences();
+        }
+        private void GetClientsSAP()
+        {
+            try
+            {
+                string clientQuery = "SELECT CardCode, CardName FROM OCRD";
+                var clients = _SAPdbConnection.Query<Client>(clientQuery);
+                foreach (Client client in clients)
                 {
-                    _inventory[product] = true;
+                    if (client != null)
+                    {
+                        _clients[client] = true;
+                        System.Console.WriteLine(client);
+                    }
+                }
+                _logger.LogInformation("Clients loaded successfully: {ClientsCount}", _clients.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogInformation("Failed to get clients from SAP. Error message: " + ex.Message);
+            }
+        }
+        private void GetClientsLO()
+        {
+            try
+            {
+                string clientQuery = "SELECT CardCode, CardName FROM Client";
+                var clients = _LOdbConnection.Query<Client>(clientQuery);
+                foreach (Client client in clients)
+                {
+                    if (client != null)
+                    {
+                        _clientsLO[client] = true;
+                        System.Console.WriteLine(client);
+                    }
+                }
+                _logger.LogInformation("Clients loaded successfully: {ClientsCount}", _clientsLO.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogInformation("Failed to get clients from Logistic Operator DB. Error message: " + ex.Message);
+            }
+        }
+        private void ProcessClientDifferences()
+        {
+            _clientsToUpdate.Clear();
+            _clientsToDelete.Clear();
+
+            foreach (var sapClient in _clients.Keys)
+            {
+                var loClient = _clientsLO.Keys.FirstOrDefault(c => c.CardCode == sapClient.CardCode);
+                if (loClient == null || !ClientsAreEqual(sapClient, loClient))
+                {
+                    _clientsToUpdate[sapClient] = true;
                 }
             }
-            _logger.LogInformation("Inventory loaded sucessfully: {InventoryCount}", _inventory.Count);
+
+            foreach (var loClient in _clientsLO.Keys)
+            {
+                var sapClient = _clients.Keys.FirstOrDefault(c => c.CardCode == loClient.CardCode);
+                if (sapClient == null)
+                {
+                    _clientsToDelete[loClient] = true;
+                }
+            }
+
+            _logger.LogInformation("Clients to update/add: {Count}", _clientsToUpdate.Count);
+            _logger.LogInformation("Clients to delete: {Count}", _clientsToDelete.Count);
+        }
+        private bool ClientsAreEqual(Client c1, Client c2)
+        {
+            return c1.CardCode == c2.CardCode && c1.CardName == c2.CardName;
+        }
+        private void SetClients()
+        {
+
+            try
+            {
+                if (_clientsToDelete.Count != 0)
+                {
+                    foreach (var kvp in _clientsToDelete)
+                    {
+                        string ClientDelete = $"DELETE FROM Client WHERE CardCode = {kvp.Key.CardCode})";
+                        _LOdbConnection.Query<Client>(ClientDelete);
+                    }
+                }
+                foreach (var kvp in _clientsToUpdate)
+                {
+                    if (_clientsLO.ContainsKey(kvp.Key))
+                    {
+                        string ClientUpdate = $"UPDATE Client SET CardName = {kvp.Key.CardName} WHERE CardCode = {kvp.Key.CardCode}";
+                        _LOdbConnection.Query<Client>(ClientUpdate);
+                    }
+                    else
+                    {
+                        string ClientInsert = $"INSERT INTO Client (CardCode, CardName) VALUES('{kvp.Key.CardCode}', '{kvp.Key.CardName}')";
+                        _LOdbConnection.Query<Client>(ClientInsert);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogInformation("An error occurred while updating the database. Error message: {message}", ex.Message);
+            }
+        }
+        private void GetInventorySAP()
+        {
+            try
+            {
+                string inventoryQuery = "SELECT ItemCode, ItemName, OnHand, PriceUnit FROM OITM WHERE OnHand > 0";
+                var inventory = _SAPdbConnection.Query<Product>(inventoryQuery);
+                foreach (Product product in inventory)
+                {
+                    if (product != null)
+                    {
+                        _inventory[product] = true;
+                        System.Console.WriteLine(product);
+                    }
+                }
+                _logger.LogInformation("Inventory loaded successfully: {InventoryCount}", _inventory.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogInformation("Failed to get inventory from SAP. Error message: " + ex.Message);
+            }
+        }
+        private void GetInventoryLO()
+        {
+            try
+            {
+                string inventoryQuery = "SELECT ItemCode, ItemName, OnHand, PriceUnit FROM Inventory WHERE OnHand > 0";
+                var inventory = _LOdbConnection.Query<Product>(inventoryQuery);
+                foreach (Product product in inventory)
+                {
+                    if (product != null)
+                    {
+                        _inventoryLO[product] = true;
+                        System.Console.WriteLine(product);
+                    }
+                }
+                _logger.LogInformation("Inventory loaded successfully: {InventoryCount}", _inventoryLO.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogInformation("Failed to get inventory from Logistic Operator DB. Error message: " + ex.Message);
+            }
+        }
+        private void ProcessInventoryDifferences()
+        {
+            _inventoryToUpdate.Clear();
+            _inventoryToDelete.Clear();
+
+            foreach (var sapProduct in _inventory.Keys)
+            {
+                var loProduct = _inventoryLO.Keys.FirstOrDefault(p => p.ItemCode == sapProduct.ItemCode);
+                if (loProduct == null || !ProductsAreEqual(sapProduct, loProduct))
+                {
+                    _inventoryToUpdate[sapProduct] = true;
+                }
+            }
+
+            foreach (var loProduct in _inventoryLO.Keys)
+            {
+                var sapProduct = _inventory.Keys.FirstOrDefault(p => p.ItemCode == loProduct.ItemCode);
+                if (sapProduct == null)
+                {
+                    _inventoryToDelete[loProduct] = true;
+                }
+            }
+
+            _logger.LogInformation("Products to update/add: {Count}", _inventoryToUpdate.Count);
+            _logger.LogInformation("Products to delete: {Count}", _inventoryToDelete.Count);
+        }
+        private bool ProductsAreEqual(Product p1, Product p2)
+        {
+            return p1.ItemCode == p2.ItemCode &&
+                   p1.ItemName == p2.ItemName &&
+                   p1.OnHand == p2.OnHand &&
+                   p1.PriceUnit == p2.PriceUnit;
         }
         private void SetInventory()
         {
-            if (_ErrorCount == 0)
+            try
             {
-                //Load the inventory to the Logistic Operator
-                foreach (var kvp in _inventory)
+                if (_inventoryToDelete.Count != 0)
                 {
-                    var product = kvp.Key;
-
-                    if (product != null)
+                    foreach (var kvp in _inventoryToDelete)
                     {
-                        //Fix Insert
-                        string InventoryInsert = $"INSERT INTO LogisticInventory (ItemCode, ItemName, OnHand, UnitPrice) VALUES('{product.ItemCode}', '{product.ItemName}', {product.OnHand}, {product.UnitPrice}')";
+                        string InventoryDelete = $"DELETE FROM Inventory WHERE ItemCode = '{kvp.Key.ItemCode}'";
+                        _LOdbConnection.Query<Product>(InventoryDelete);
+                    }
+                }
+                foreach (var kvp in _inventoryToUpdate)
+                {
+                    if (_inventoryLO.ContainsKey(kvp.Key))
+                    {
+                        string InventoryUpdate = $"UPDATE Inventory SET ItemName = '{kvp.Key.ItemName}', OnHand = {kvp.Key.OnHand}, PriceUnit = {kvp.Key.PriceUnit} WHERE ItemCode = '{kvp.Key.ItemCode}'";
+                        _LOdbConnection.Query<Product>(InventoryUpdate);
+                    }
+                    else
+                    {
+                        string InventoryInsert = $"INSERT INTO Inventory (ItemCode, ItemName, OnHand, PriceUnit) VALUES('{kvp.Key.ItemCode}', '{kvp.Key.ItemName}', {kvp.Key.OnHand}, {kvp.Key.PriceUnit})";
                         _LOdbConnection.Query<Product>(InventoryInsert);
                     }
                 }
-                _logger.LogInformation("Inventory imported sucessfully: {InventoryCount}", _inventory.Count);
             }
-            else
+            catch (Exception ex)
             {
-                _logger.LogInformation("Couldn't import inventory, check logging.");
+                _logger.LogInformation("An error occurred while updating the database. Error message: {message}", ex.Message);
             }
 
         }
-        private void GetBatches()
+        private void GetBatchesSAP()
         {
-            //Select to get all the batches in SAP
-            string BatchQuery = "SELECT ItemCode, BatchCode, PrdDate, ExpDate, Quantity FROM OIBT";
-            var batches = _SAPdbConnection.Query<Batch>(BatchQuery);
-            foreach (Batch batch in batches)
+            try
             {
-                if (batch != null)
+                string batchQuery = "SELECT ItemCode, BatchNum, PrdDate, ExpDate, Quantity, WhsCode FROM OIBT";
+                var batches = _SAPdbConnection.Query<Batch>(batchQuery);
+                foreach (Batch batch in batches)
                 {
-                    _batches[batch] = true;
+                    if (batch != null)
+                    {
+                        _batches[batch] = true;
+                        System.Console.WriteLine(batch);
+                    }
                 }
+                _logger.LogInformation("Batches loaded successfully: {Batches}", _batches.Count);
             }
-            _logger.LogInformation("Batches loaded sucessfully: {Batches}", _batches.Count);
+            catch (Exception ex)
+            {
+                _logger.LogInformation("Failed to get batches from SAP. Error message: " + ex.Message);
+            }
         }
-        private void ValidateBatches()
+        private void GetBatchesLO()
         {
-
-            foreach (var kvp in _batches)
+            try
             {
-                var batch = kvp.Key;
-
-                var ItemCode = batch.ItemCode;
-                var BatchCode = batch.BatchCode;
-                var ExpDate = batch.ExpDate;
-                var Quantity = batch.Quantity;
-
-                //Validate if the ItemCode assigned to a batch exists.
-                if (!_inventory.Keys.Any(product => product.ItemCode == ItemCode))
+                string batchQuery = "SELECT ItemCode, BatchNum, PrdDate, ExpDate, Quantity FROM Batches";
+                var batches = _LOdbConnection.Query<Batch>(batchQuery);
+                foreach (Batch batch in batches)
                 {
-                    batch.IsBlocked = true;
-                    batch.BlockReason = "Invalid batch: ItemCode does not exist in inventory.";
-                    _ErrorCount++;
-                    _logger.LogInformation("Batch {BatchCode} blocked: Item {ItemCode} does not exist in inventory.", BatchCode, ItemCode);
+                    if (batch != null)
+                    {
+                        _batchesLO[batch] = true;
+                        System.Console.WriteLine(batch);
+                    }
                 }
+                _logger.LogInformation("Batches loaded successfully: {Batches}", _batchesLO.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogInformation("Failed to get batches from Logistic Operator DB. Error message: " + ex.Message);
+            }
+        }
+        private void ProcessBatchDifferences()
+        {
+            _batchesToUpdate.Clear();
+            _batchesToDelete.Clear();
 
-                //Validate if the batch have an product left.
-                if (Quantity == 0)
-                {
-                    batch.IsBlocked = true;
-                    batch.BlockReason = "Empty batch: No product left.";
-                    _ErrorCount++;
-                    _logger.LogInformation("Batch {BatchCode} blocked: No product left.", BatchCode);
-                }
+            foreach (var sapBatch in _batches.Keys)
+            {
+                var loBatch = _batchesLO.Keys.FirstOrDefault(b =>
+                    b.ItemCode == sapBatch.ItemCode &&
+                    b.BatchNum == sapBatch.BatchNum);
 
-                //Validate if the products on the batch are expired.
-                if (ExpDate < DateTime.Today)
+                if (loBatch == null || !BatchesAreEqual(sapBatch, loBatch))
                 {
-                    batch.IsBlocked = true;
-                    batch.BlockReason = "Expired batch: Products are expired.";
-                    _ErrorCount++;
-                    _logger.LogInformation("Batch {BatchCode} blocked: Expired on {ExpDate}.", BatchCode, ExpDate);
+                    _batchesToUpdate[sapBatch] = true;
                 }
             }
+
+            foreach (var loBatch in _batchesLO.Keys)
+            {
+                var sapBatch = _batches.Keys.FirstOrDefault(b =>
+                    b.ItemCode == loBatch.ItemCode &&
+                    b.BatchNum == loBatch.BatchNum);
+
+                if (sapBatch == null)
+                {
+                    _batchesToDelete[loBatch] = true;
+                }
+            }
+
+            _logger.LogInformation("Batches to update/add: {Count}", _batchesToUpdate.Count);
+            _logger.LogInformation("Batches to delete: {Count}", _batchesToDelete.Count);
+        }
+        private bool BatchesAreEqual(Batch b1, Batch b2)
+        {
+            return b1.ItemCode == b2.ItemCode &&
+                   b1.BatchNum == b2.BatchNum &&
+                   b1.PrdDate == b2.PrdDate &&
+                   b1.ExpDate == b2.ExpDate &&
+                   b1.Quantity == b2.Quantity;
         }
         private void SetBatches()
         {
-            //Load all the batches to the Logistic Operator
-            foreach (var kvp in _batches)
+            try
             {
-                var batch = kvp.Key;
-                if (_batches != null)
+                if (_batchesToDelete.Count != 0)
                 {
-                    string BatchInsert = $"INSERT INTO LogisticBatches (ItemCode, BatchCode, PrdDate, ExpDate, Quantity) VALUES('{batch.ItemCode}', '{batch.BatchCode}', '{batch.PrdDate}', '{batch.ExpDate}', {batch.Quantity})";
-
-                    _LOdbConnection.Query<Product>(BatchInsert);
+                    foreach (var kvp in _batchesToDelete)
+                    {
+                        string BatchDelete = $"DELETE FROM Batches WHERE ItemCode = '{kvp.Key.ItemCode}' AND BatchNum = '{kvp.Key.BatchNum}'";
+                        _LOdbConnection.Query<Batch>(BatchDelete);
+                    }
+                }
+                foreach (var kvp in _batchesToUpdate)
+                {
+                    if (_batchesLO.ContainsKey(kvp.Key))
+                    {
+                        string BatchUpdate = $"UPDATE Batches SET PrdDate = '{kvp.Key.PrdDate:yyyy-MM-dd}', ExpDate = '{kvp.Key.ExpDate:yyyy-MM-dd}', Quantity = {kvp.Key.Quantity} " +
+                                             $"WHERE ItemCode = '{kvp.Key.ItemCode}' AND BatchNum = '{kvp.Key.BatchNum}'";
+                        _LOdbConnection.Query<Batch>(BatchUpdate);
+                    }
+                    else
+                    {
+                        string BatchInsert = $"INSERT INTO Batches (ItemCode, BatchNum, PrdDate, ExpDate, Quantity) VALUES(" +
+                                             $"'{kvp.Key.ItemCode}', '{kvp.Key.BatchNum}', '{kvp.Key.PrdDate:yyyy-MM-dd}', '{kvp.Key.ExpDate:yyyy-MM-dd}', {kvp.Key.Quantity})";
+                        _LOdbConnection.Query<Batch>(BatchInsert);
+                    }
                 }
             }
-            _logger.LogInformation("Inventory imported sucessfully: {InventoryCount}", _inventory.Count);
+            catch (Exception ex)
+            {
+                _logger.LogInformation("An error occurred while updating the database. Error message: {message}", ex.Message);
+            }
+
         }
+
     }
 }
