@@ -129,7 +129,7 @@ Public MustInherit Class SEI_Addon
         Const cModulos As String = "43520"
         '
         Me.AddMenuItem("SEI_ConfigurarAddon", "8192", False, True, "", 11, "Configurar Add-on", SAPbouiCOM.BoMenuType.mt_STRING)
-        Me.AddMenuItem("8765", "43520", False, True, "", -1, "Integración Logística", SAPbouiCOM.BoMenuType.mt_POPUP)
+        Me.AddMenuItem("8765", "43520", False, True, "C:\Users\nraoui\source\repos\OperadorLogistico\MonitorDeComandes\Images\IntegrationLogistic.bmp", -1, "Integración Logística", SAPbouiCOM.BoMenuType.mt_POPUP)
         Me.AddMenuItem("SEI_OrdersMonitor", "8765", False, True, "", -1, "Order Monitor", SAPbouiCOM.BoMenuType.mt_STRING)
         Me.AddMenuItem("SEI_ConfOrders", "8765", False, True, "", 1, "Confirmation orders", SAPbouiCOM.BoMenuType.mt_STRING)
         '

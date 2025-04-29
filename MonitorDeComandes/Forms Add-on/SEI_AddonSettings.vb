@@ -238,6 +238,7 @@ Public Class SEI_AddonSettings
         oCreateTablesSL = New SEI_CreateTablesSL(Me.m_ParentAddon)
         oCreateTablesSL.AddUserTables().Wait()
 
+
         'oCreateTables = New SEI_CreateTables(SubMain.m_SBOAddon)
         'oCreateTables.AddUserTables()
         ''
