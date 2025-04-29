@@ -179,6 +179,9 @@ Public Class SEI_SBOAddon
                     Case SEI_AddonEnum.enAddonMenus.OrdersMonitor.ToUpper
                         Dim oForm As SEI_Form
                         oForm = New SEI_OrdersMonitor(Me)
+                    Case SEI_AddonEnum.enAddonMenus.ConfOrders.ToUpper
+                        Dim oForm As SEI_Form
+                        oForm = New SEI_ConfOrders(Me)
 
 
                     Case Else
