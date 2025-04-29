@@ -5,8 +5,11 @@
 @using BlazorTemplate.Models
 @using BlazorTemplate.Interfaces
 @using Microsoft.FluentUI.AspNetCore.Components
+@using BlazorTemplate.Services
 @inject IDialogService _dialogService
 @inject IOrderService _orderService
+@inject ISelectedOrdersService _selectedOrdersService
+@inject NavigationManager _navigationManager
 @page "/TestTemplate"
 @implements IDisposable
 
@@ -16,7 +19,12 @@
 <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
     <FluentButton Appearance="Appearance.Accent" OnClick="@LoadOrdersFromFiles">Cargar Comandas</FluentButton>
     <FluentSpacer />
-    <FluentButton Appearance="Appearance.Accent" Style="margin-right: 40px" BackgroundColor="#28a745">Subir Comandas</FluentButton>
+
+    <FluentButton Appearance="Appearance.Accent" Style="margin-right: 40px" BackgroundColor="#28a745"
+                  OnClick="@(async () => await NavigateToBatchWithSelected())">
+        Subir Comandas
+    </FluentButton>
+
     @if (isLoading)
     {
         <FluentProgressRing />
@@ -35,7 +43,7 @@
             <PropertyColumn Property="@(o => o.Date)" Format="yyyy-MM-dd" Sortable="true" />
             <PropertyColumn Property="@(o => o.Expiration)" Format="yyyy-MM-dd" Sortable="true" />
             <PropertyColumn Property="@(o => o.LineCount)" Title="Líneas" Sortable="true" />
-            <TemplateColumn Title="Acción">
+            <TemplateColumn Title="">
                 <ChildContent>
                     <button @onclick="@(() => HandleRowClick(context))"
                             style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; display: flex; justify-content: center; align-items: center;">
@@ -82,12 +90,6 @@
                 <PropertyColumn Property="@(li => li.Quantity)" Title="Cantidad" Sortable="true" />
             </FluentDataGrid>
         </div>
-
-        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" Style="margin-top: 16px;">
-            <FluentButton Appearance="Appearance.Accent" OnClick="@(() => ConfirmOrderToSAP(selectedOrder.ID))" Style="padding: 2px 8px; font-size: 13px;">
-                Confirmar en SAP
-            </FluentButton>
-        </FluentStack>
     }
     else
     {
@@ -115,6 +117,9 @@
     protected override void OnInitialized()
     {
         base.OnInitialized();
+
+        // Limpiar órdenes seleccionadas anteriores al cargar esta página
+        _selectedOrdersService.ClearSelectedOrders();
     }
 
     // Method to check if an order is checked
@@ -135,6 +140,33 @@
             checkedOrders[orderId] = true;
         }
         StateHasChanged();
+    }
+
+    // Método para navegar a LayoutBatch con las órdenes seleccionadas
+    private async Task NavigateToBatchWithSelected()
+    {
+        // Obtener IDs de órdenes seleccionadas
+        var selectedOrderIds = checkedOrders
+            .Where(kvp => kvp.Value && kvp.Key > 0)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        if (selectedOrderIds.Count == 0)
+        {
+            await _dialogService.ShowInfoAsync("No hay comandas seleccionadas", "Información");
+            return;
+        }
+
+        // Obtener las órdenes completas usando los IDs
+        var selectedOrdersData = processedOrders
+            .Where(o => selectedOrderIds.Contains(o.ID))
+            .ToList();
+
+        // Guardar en el servicio compartido
+        _selectedOrdersService.SetSelectedOrders(selectedOrdersData);
+
+        // Navegar a la página de Batch
+        _navigationManager.NavigateTo("/LayoutBatch");
     }
 
     private async Task LoadOrdersFromFiles()
@@ -179,7 +211,7 @@
             int itemsToAdd = Math.Max(0, pagination.ItemsPerPage - orderList.Count);
             for (int i = 0; i < itemsToAdd; i++)
             {
-            // Usar IDs negativos para evitar conflictos de clave
+                // Usar IDs negativos para evitar conflictos de clave
                 orderList.Add(new Order(-i - 1, $"Empty-{i + 1}", new DateOnly(), new DateOnly(), 0));
             }
 

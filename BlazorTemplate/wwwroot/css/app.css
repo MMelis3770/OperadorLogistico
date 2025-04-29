@@ -183,3 +183,84 @@ code {
         border: none;
     }
 }
+/* Agregar estos estilos a su archivo CSS de la aplicación (por ejemplo, app.css) */
+
+/* Contenedores para la grid y paginación */
+.grid-and-pagination-container {
+    display: flex;
+    flex-direction: column;
+    margin-top: 20px;
+}
+
+.fixed-height-grid-container {
+    min-height: 400px;
+    max-height: 450px;
+    overflow: auto;
+    border: 1px solid var(--neutral-stroke-accessible);
+    border-radius: 4px;
+}
+
+.paginator-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    padding: 0 8px;
+}
+
+.right-section {
+    display: flex;
+    align-items: center;
+}
+
+/* Estilos para detalles de orden */
+.detail-container {
+    margin-top: 20px;
+    max-height: 300px;
+    overflow: auto;
+    border: 1px solid var(--neutral-stroke-accessible);
+    border-radius: 4px;
+}
+
+.detail-grid {
+    min-height: 200px;
+}
+
+/* Fijar el tamaño de las filas en grids */
+.fixed-row-grid ::deep tr {
+    height: 48px;
+}
+
+/* Estilos para alertas */
+.alert {
+    padding: 12px;
+    margin: 12px 0;
+    border-radius: 4px;
+}
+
+.alert-info {
+    background-color: var(--accent-fill-rest);
+    color: white;
+}
+
+.alert-warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+/* Estilos para botones con iconos */
+button.icon-button {
+    background: none;
+    border: none;
+    padding: 4px;
+    margin: 0;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Destacar filas seleccionadas */
+.selected-row {
+    background-color: var(--neutral-layer-3);
+}
