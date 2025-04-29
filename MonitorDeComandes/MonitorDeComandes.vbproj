@@ -181,6 +181,7 @@
     <Compile Include="Classes\Initialize\SEI_SQL.vb" />
     <Compile Include="Classes\Useful\DataTableExtension.vb" />
     <Compile Include="Crystal Report\SEI_CrystalReport.vb" />
+    <Compile Include="Forms Add-on\SEI_ConfOrders.vb" />
     <Compile Include="Forms Add-on\SEI_OrdersMonitor.vb" />
     <Compile Include="Forms Add-on\SEI_AddonSettings.vb" />
     <Compile Include="Forms SAP\SEI_AlbaranCompras.vb" />

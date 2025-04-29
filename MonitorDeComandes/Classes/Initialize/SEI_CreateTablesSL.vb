@@ -1,8 +1,5 @@
-﻿Imports System.Collections.Generic
-Imports System.Linq
+﻿Imports System.Linq
 Imports System.Threading.Tasks
-Imports Newtonsoft.Json
-Imports Newtonsoft.Json.Linq
 Imports SAPbobsCOM
 Imports SEIDOR_SLayer
 
@@ -64,40 +61,27 @@ Public Class SEI_CreateTablesSL
               codesValidValues:=statusCodes, namesValidValues:=statusNames)
             Await CreateUserDataField("@" & tableDetail, "ErrorMsg", "Line Error", BoFieldTypes.db_Alpha, 254)
 
-            '    Dim formFieldsStrArray As String() = {
-            '    "U_DocEntry",
-            '    "U_DocNum",
-            '    "U_Status",
-            '    "U_ConfDate",
-            '    "U_ErrorMsg",
-            '    "U_DocEntry",
-            '    "U_LineNum",
-            '    "U_ItemCode",
-            '    "U_Quantity",
-            '    "U_LotNumber",
-            '    "U_LineStatus",
-            '    "U_ErrorMsg"
-            '}
-
-            '    Dim findFields As String() = {"U_DocEntry", "U_DocNum", "U_Status"}
-
-            Dim srfPath As String = "C:\Users\mcorder\OneDrive - SEIDOR SOLUTIONS S.L\PFG\OperadorLogistico\MonitorDeComandes\Forms .srf\SEI_ConfOrders.srf"
 
             Await CreateUserUDO(
-            name:=tableHeader,
-            description:="Confirmation Orders",
-            logTable:="A" & tableHeader,
-            type:=BoUDOObjType.boud_Document,
-            canFind:=BoYesNoEnum.tYES,
-            defaultForm:=BoYesNoEnum.tNO,
-            fatherMenu:="8765", '43545  -  8765
-            array_ChildTables:={tableDetail},
-            position:=-1,
-            formSRFPath:=srfPath)
-
-            'array_ChildTables:={tableDetail},
-            'array_FindFields:=findFields,
-            'array_FormFields:=formFieldsStrArray,
+                name:=tableHeader,
+                description:="Confirmation Orders",
+                logTable:="A" & tableHeader,
+                type:=BoUDOObjType.boud_Document,
+                canCancel:=BoYesNoEnum.tYES,
+                canClose:=BoYesNoEnum.tYES,
+                defaultForm:=BoYesNoEnum.tNO,
+                canDelete:=BoYesNoEnum.tNO,
+                canFind:=BoYesNoEnum.tYES,
+                canLog:=BoYesNoEnum.tYES,
+                canYearTransfer:=BoYesNoEnum.tNO,
+                manageSeries:=BoYesNoEnum.tYES,
+                fatherMenu:=Nothing,
+                position:=Nothing,                    '
+                array_ChildTables:={tableDetail},
+                array_FindFields:=Nothing,
+                array_FormFields:=Nothing,
+                formSRFPath:=Nothing
+            )
 
             Console.WriteLine("UDO creado exitosamente")
         Catch ex As Exception
@@ -229,32 +213,36 @@ Public Class SEI_CreateTablesSL
         Dim response = Await m_ParentAddon.oSLConnection.Request("UserObjectsMD").Filter($"Code eq '{name}'").GetAllAsync(Of Object)()
         If response.Count = 0 Then
             Dim userObject = New With {
-                .CanCancel = canCancel.ToString(),
-                .CanClose = canClose.ToString(),
-                .CanCreateDefaultForm = defaultForm.ToString(),
-                .CanDelete = canDelete.ToString(),
-                .CanFind = canFind.ToString(),
-                .CanLog = canLog.ToString(),
-                .CanYearTransfer = canYearTransfer.ToString(),
-                .Code = name,
-                .TableName = name,
-                .LogTableName = logTable,
-                .ObjectType = type.ToString(),
-                .Name = description,
-                .ManageSeries = manageSeries.ToString(),
-                .UseUniqueFormType = BoYesNoEnum.tYES.ToString(),
-                .UserObjectMD_ChildTables = If(array_ChildTables IsNot Nothing, array_ChildTables.Select(Function(t) New With {.TableName = t}).ToList(), Nothing),
-                .FindColumns = If(canFind = BoYesNoEnum.tYES AndAlso array_FindFields IsNot Nothing, array_FindFields.Select(Function(f) New With {.ColumnAlias = f}).ToList(), Nothing),
-                .FormColumns = If(defaultForm = BoYesNoEnum.tYES AndAlso array_FormFields IsNot Nothing, array_FormFields.Where(Function(f) Not f.Trim().ToUpper().Equals("CODE")).Select(Function(f) New With {.FormColumnAlias = f}).Prepend(New With {.FormColumnAlias = "Code"}).ToList(), Nothing),
-                .FormSRF = If(Not String.IsNullOrEmpty(formSRFPath), formSRFPath.Replace("\", "/"), Nothing),
-                .EnableEnhancedForm = BoYesNoEnum.tNO.ToString(),
-                .MenuItem = BoYesNoEnum.tYES.ToString(),
-                .MenuCaption = description,
-                .MenuUID = name,
-                .FatherMenuID = fatherMenu,
-                .Position = position
-            }
+            .CanCancel = canCancel.ToString(),
+            .CanClose = canClose.ToString(),
+            .CanCreateDefaultForm = defaultForm.ToString(),
+            .CanDelete = canDelete.ToString(),
+            .CanFind = canFind.ToString(),
+            .CanLog = canLog.ToString(),
+            .CanYearTransfer = canYearTransfer.ToString(),
+            .Code = name,
+            .TableName = name,
+            .LogTableName = logTable,
+            .ObjectType = type.ToString(),
+            .Name = description,
+            .ManageSeries = manageSeries.ToString(),
+            .UseUniqueFormType = BoYesNoEnum.tYES.ToString(),
+            .UserObjectMD_ChildTables = If(array_ChildTables IsNot Nothing, array_ChildTables.Select(Function(t) New With {.TableName = t}).ToList(), Nothing),
+            .FindColumns = If(canFind = BoYesNoEnum.tYES AndAlso array_FindFields IsNot Nothing, array_FindFields.Select(Function(f) New With {.ColumnAlias = f}).ToList(), Nothing),
+            .FormColumns = If(defaultForm = BoYesNoEnum.tYES AndAlso array_FormFields IsNot Nothing, array_FormFields.Where(Function(f) Not f.Trim().ToUpper().Equals("CODE")).Select(Function(f) New With {.FormColumnAlias = f}).Prepend(New With {.FormColumnAlias = "Code"}).ToList(), Nothing),
+            .FormSRF = If(Not String.IsNullOrEmpty(formSRFPath), formSRFPath.Replace("\", "/"), Nothing),
+            .EnableEnhancedForm = BoYesNoEnum.tNO.ToString(),
+            .MenuItem = BoYesNoEnum.tYES.ToString(),
+            .MenuCaption = description,
+            .MenuUID = name,
+            .FatherMenuID = fatherMenu,
+            .Position = position
+        }
+
             Await m_ParentAddon.oSLConnection.Request("UserObjectsMD").PostAsync(userObject)
+            Console.WriteLine($"UDO {name} created successfully")
+        Else
+            Console.WriteLine($"UDO {name} already exists")
         End If
     End Function
 

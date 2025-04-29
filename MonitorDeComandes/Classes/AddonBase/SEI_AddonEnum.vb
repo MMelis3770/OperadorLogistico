@@ -143,11 +143,13 @@ Public Class SEI_AddonEnum
         ' FORMULARIOS USUARIO
         Const f_AddonSettings As String = "SEICONFIG"
         Const f_OrdersMonitor As String = "SEIORDERSMONITOR"
+        Const f_ConfOrders As String = "SEICONFORDERS"
     End Structure
     Public Structure enAddonMenus
         ' MENUS ADD-ON:
         Const ConfigurarAddon As String = "SEI_ConfigurarAddon"
         Const OrdersMonitor As String = "SEI_OrdersMonitor"
+        Const ConfOrders As String = "SEI_ConfOrders"
 
     End Structure
 #End Region
