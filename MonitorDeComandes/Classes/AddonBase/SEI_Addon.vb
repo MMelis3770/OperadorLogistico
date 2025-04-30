@@ -135,8 +135,6 @@ Public MustInherit Class SEI_Addon
         '
         'Menú Modelo:
 
-        'Me.AddMenuItem(enAddonMenus.ExcelGasoil, "43540", False, True, "", -1, "Carga Excel Gasoil", SAPbouiCOM.BoMenuType.mt_POPUP)
-
         'Colocar monitorcomandes a on correspongui
     End Sub
     Private Sub AddMenuItem(ByVal sIDMenu As String, ByVal sFatherMenu As String, ByVal bChecked As Boolean, ByVal bEnabled As Boolean, ByVal sImage As String,

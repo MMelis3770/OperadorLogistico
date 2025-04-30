@@ -435,8 +435,6 @@ Public Class SEI_OrdersMonitor
 
                     If sendChecked = "Y" And orderStatus = "Delivered" Then
                         isOrderSelected = True
-                        'Do post invoice
-
                         PatchOrder(docEntry, "Invoiced").Wait()
                     ElseIf sendChecked = "Y" And orderStatus <> "Delivered" Then
                         SBO_Application.StatusBar.SetText("You cannot create an invoice, there is no delivery created.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)

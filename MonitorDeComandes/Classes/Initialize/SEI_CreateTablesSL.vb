@@ -1,37 +1,24 @@
 ﻿Imports System.Linq
 Imports System.Threading.Tasks
+Imports Newtonsoft.Json.Linq
 Imports SAPbobsCOM
 Imports SEIDOR_SLayer
 
 Public Class SEI_CreateTablesSL
 
-#Region "Attributes"
-    Private ReadOnly m_ParentAddon As SEI_Addon
-    Private Enum SLTableType
-        bot_NoObject = 0
-        bot_Document = 1
-        bot_DocumentLines = 2
-        bot_MasterData = 3
-        bot_MasterDataLines = 4
-    End Enum
-#End Region
 
-#Region "Constructor"
-    Public Sub New(ByRef ParentAddon As SEI_Addon)
-        m_ParentAddon = ParentAddon
-    End Sub
-#End Region
+
 
     Public Async Function AddUserTables() As Task
-        Try
-            Console.WriteLine("Starting UDO creation process...")
-            Await CreateUDO()
-        Catch ex As Exception
-            Console.WriteLine($"Error in main process: {ex.Message}")
-            Throw
-        End Try
+        'Await CreateUserDataDefinedField()
+        Await CreateUDO()
+
     End Function
 
+    Private Async Function CreateUserDataDefinedField() As Threading.Tasks.Task
+
+        Await CreateUserDataField("ORDR", "OrdersStatus", "OrdersStatus", BoFieldTypes.db_Alpha, 50)
+    End Function
     Private Async Function CreateUDO() As Task
         Const tableHeader As String = "CONF_ORDERS"
         Const headerDescription As String = "Confirmed Orders Header"
@@ -90,24 +77,20 @@ Public Class SEI_CreateTablesSL
         End Try
     End Function
 
-    Private Async Function CreateUserTables(
-        name As String,
-        description As String,
-        iType As BoUTBTableType
-    ) As Task
+    Private Async Function CreateUserTables(name As String, description As String, iType As BoUTBTableType) As Task
         Try
-            Dim response = Await m_ParentAddon.oSLConnection.Request("UserTablesMD").Filter($"TableName eq '{name.Replace("@", "")}'").GetAllAsync(Of Object)()
+            Dim response = Await m_SBOAddon.oSLConnection.Request("UserTablesMD").Filter($"TableName eq '{name.Replace("@", "")}'").GetAllAsync(Of JObject)()
             If response.Count = 0 Then
-                Await m_ParentAddon.oSLConnection.Request("UserTablesMD").PostAsync(New With {
-                    .TableName = name.Replace("@", ""),
-                    .TableDescription = description,
-                    .TableType = iType.ToString()
+                Await m_SBOAddon.oSLConnection.Request("UserTablesMD").PostAsync(New With {
+                    Key .TableName = name.Replace("@", ""),
+                    Key .TableDescription = description,
+                    Key .TableType = iType.ToString()
                 })
             End If
         Catch ex As Exception
-            Console.WriteLine($"Error creating table {name}: {ex.Message}")
-            Throw
+            Console.WriteLine($"Error creating user table: {ex.Message}")
         End Try
+
     End Function
 
     Private Async Function CreateUserDataField(
@@ -126,7 +109,7 @@ Public Class SEI_CreateTablesSL
     Optional mandatory As BoYesNoEnum = BoYesNoEnum.tNO
 ) As Task
         Try
-            Dim response = Await m_ParentAddon.oSLConnection.Request("UserFieldsMD").Filter($"TableName eq '{table}' and Name eq '{field}'").GetAllAsync(Of Object)()
+            Dim response = Await m_SBOAddon.oSLConnection.Request("UserFieldsMD").Filter($"TableName eq '{table}' and Name eq '{field}'").GetAllAsync(Of Object)()
             If response.Count = 0 Then
                 If mandatory = BoYesNoEnum.tYES AndAlso String.IsNullOrEmpty(defaultValue) Then
                     Throw New Exception($"Debe definirse un valor por defecto para el campo '{field}-{description}'")
@@ -147,12 +130,12 @@ Public Class SEI_CreateTablesSL
             }
 
                 Console.WriteLine($"Creating field {field} in table {table}")
-                Await m_ParentAddon.oSLConnection.Request("UserFieldsMD").PostAsync(basicField)
+                Await m_SBOAddon.oSLConnection.Request("UserFieldsMD").PostAsync(basicField)
 
                 If codesValidValues IsNot Nothing AndAlso namesValidValues IsNot Nothing AndAlso codesValidValues.Length > 0 Then
                     Console.WriteLine($"Adding valid values for field {field}")
 
-                    Dim fieldInfo = Await m_ParentAddon.oSLConnection.Request("UserFieldsMD").Filter($"TableName eq '{table}' and Name eq '{field}'").GetAllAsync(Of Object)()
+                    Dim fieldInfo = Await m_SBOAddon.oSLConnection.Request("UserFieldsMD").Filter($"TableName eq '{table}' and Name eq '{field}'").GetAllAsync(Of Object)()
                     If fieldInfo.Count > 0 Then
                         Dim fieldId As String = field
 
@@ -170,7 +153,7 @@ Public Class SEI_CreateTablesSL
                             }
 
                                 Console.WriteLine($"  Adding value {codesValidValues(i)} - {namesValidValues(i)}")
-                                Await m_ParentAddon.oSLConnection.Request(url).PatchAsync(validValue)
+                                Await m_SBOAddon.oSLConnection.Request(url).PatchAsync(validValue)
                                 Console.WriteLine($"  Value added successfully")
                             Catch vvEx As Exception
                                 Console.WriteLine($"  Error adding valid value: {vvEx.Message}")
@@ -210,7 +193,7 @@ Public Class SEI_CreateTablesSL
     Optional formSRFPath As String = Nothing
 ) As Task
         name = name.Replace("@", "").ToUpper()
-        Dim response = Await m_ParentAddon.oSLConnection.Request("UserObjectsMD").Filter($"Code eq '{name}'").GetAllAsync(Of Object)()
+        Dim response = Await m_SBOAddon.oSLConnection.Request("UserObjectsMD").Filter($"Code eq '{name}'").GetAllAsync(Of Object)()
         If response.Count = 0 Then
             Dim userObject = New With {
             .CanCancel = canCancel.ToString(),
@@ -239,7 +222,7 @@ Public Class SEI_CreateTablesSL
             .Position = position
         }
 
-            Await m_ParentAddon.oSLConnection.Request("UserObjectsMD").PostAsync(userObject)
+            Await m_SBOAddon.oSLConnection.Request("UserObjectsMD").PostAsync(userObject)
             Console.WriteLine($"UDO {name} created successfully")
         Else
             Console.WriteLine($"UDO {name} already exists")

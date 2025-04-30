@@ -235,7 +235,7 @@ Public Class SEI_AddonSettings
         '
         Me.m_ParentAddon.Get_AddonSettings(Me.SBO_Company)
 
-        oCreateTablesSL = New SEI_CreateTablesSL(Me.m_ParentAddon)
+        oCreateTablesSL = New SEI_CreateTablesSL()
         oCreateTablesSL.AddUserTables().Wait()
 
 
