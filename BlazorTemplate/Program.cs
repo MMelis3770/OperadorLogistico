@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.FluentUI.AspNetCore.Components;
-
 namespace BlazorTemplate;
 internal static class Program
 {
@@ -23,7 +22,6 @@ internal static class Program
         };
         Application.Run(mainForm);
     }
-
     static IHost CreateHost()
     {
         return Host.CreateDefaultBuilder()
@@ -42,9 +40,11 @@ internal static class Program
                         orderFilesPath
                     )
                 );
-
                 // Registrar el servicio de órdenes seleccionadas
                 services.AddSingleton<ISelectedOrdersService, SelectedOrdersService>();
+
+                // Registrar el servicio de batches
+                services.AddSingleton<IBatchService, BatchService>();
             })
             .ConfigureLogging((context, logging) =>
             {

@@ -85,7 +85,7 @@
     {
         <div class="detail-container">
             <FluentDataGrid Items="@selectedOrderItems" TGridItem="OrderLineItem" Class="detail-grid">
-                <PropertyColumn Property="@(li => li.LineNumber)" Title="Línea" Sortable="true" />
+                <PropertyColumn Property="@(li => li.LineNumber + 1)" Title="Línea" Sortable="true" />
                 <PropertyColumn Property="@(li => li.ItemCode)" Title="Artículo" Sortable="true" />
                 <PropertyColumn Property="@(li => li.Quantity)" Title="Cantidad" Sortable="true" />
             </FluentDataGrid>
@@ -181,23 +181,6 @@
             // Usar OrderService para obtener órdenes
             processedOrders = await _orderService.GetOrdersAsync();
 
-            // AÑADIR ESTA SECCIÓN DE DEPURACIÓN
-            Console.WriteLine($"Se cargaron {processedOrders.Count} órdenes");
-            foreach (var order in processedOrders)
-            {
-                Console.WriteLine($"Orden ID: {order.ID}, Cliente: {order.Client}, Líneas: {order.LineItems.Count}");
-                // Imprimir algunas líneas para verificar que se cargaron correctamente
-                foreach (var line in order.LineItems.Take(2))
-                {
-                    Console.WriteLine($"  - Línea {line.LineNumber}: {line.ItemCode}, Cantidad: {line.Quantity}");
-                }
-                if (order.LineItems.Count > 2)
-                {
-                    Console.WriteLine($"  - ... y {order.LineItems.Count - 2} líneas más");
-                }
-            }
-            // FIN DE LA SECCIÓN DE DEPURACIÓN
-
             // Convertir a formato para la grid
             var orderList = processedOrders.Select(o => new Order(
                 o.ID,
@@ -246,7 +229,6 @@
         if (order == null || order.ID <= 0) return;  // Ignorar clics en filas vacías (ID ≤ 0)
 
         selectedOrder = order;
-        Console.WriteLine($"Clic en orden: {selectedOrder.ID}"); // Log para depuración
         StateHasChanged(); // Forzar actualización para mostrar el encabezado de la sección de detalles
 
         // Busca en las órdenes procesadas

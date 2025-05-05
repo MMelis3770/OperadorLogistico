@@ -1,0 +1,228 @@
+﻿@using BlazorTemplate.Models
+@using BlazorTemplate.Interfaces
+@using Microsoft.FluentUI.AspNetCore.Components
+@using BlazorTemplate.Services
+@inject IBatchService _batchService
+
+@if (IsOpen)
+{
+    <FluentDialog Open="@IsOpen" Width="500px">
+        <FluentDialogHeader>
+            <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
+                <FluentIcon Value="@(new Icons.Regular.Size24.SlideSearch())" Color="Color.Accent" />
+                <h3>Información de Lotes</h3>
+            </FluentStack>
+        </FluentDialogHeader>
+        <FluentDialogBody>
+            @if (IsLoading)
+            {
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
+                    <FluentProgressRing />
+                    <span>Cargando información de lotes...</span>
+                </FluentStack>
+            }
+            else
+            {
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="12">
+                    <FluentGrid Columns="2" ColumnGap="16" RowGap="12">
+                        <FluentGridItem>
+                            <FluentLabel>Orden:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span>@OrderId</span>
+                        </FluentGridItem>
+
+                        <FluentGridItem>
+                            <FluentLabel>Línea:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span>@(LineNumber + 1)</span>
+                        </FluentGridItem>
+
+                        <FluentGridItem>
+                            <FluentLabel>Artículo:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span>@ItemCode</span>
+                        </FluentGridItem>
+
+                        <FluentGridItem>
+                            <FluentLabel>Cantidad Total:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span>@Quantity</span>
+                        </FluentGridItem>
+                    </FluentGrid>
+
+                    <FluentDivider Style="margin: 12px 0;" />
+
+                    @if (BatchAssignments?.Any() == true)
+                    {
+                        <h4>Lotes Asignados</h4>
+                        <table class="batch-info-table">
+                            <thead>
+                                <tr>
+                                    <th>Lote</th>
+                                    <th>Cantidad</th>
+                                    <th>Vigencia</th>
+                                    <th>Disponible</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var assignment in BatchAssignments)
+                                {
+                                    var batchInfo = GetBatchInfo(assignment.BatchId);
+                                    <tr>
+                                        <td>@assignment.BatchId</td>
+                                        <td>@assignment.Quantity</td>
+                                        <td>
+                                            @if (batchInfo != null)
+                                            {
+                                                <span>@batchInfo.StartDate.ToString("yyyy-MM-dd") a @batchInfo.EndDate.ToString("yyyy-MM-dd")</span>
+                                            }
+                                            else
+                                            {
+                                                <span>--</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (batchInfo != null)
+                                            {
+                                                <span>@batchInfo.AvailableQuantity</span>
+                                            }
+                                            else
+                                            {
+                                                <span>--</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td><strong>Total</strong></td>
+                                    <td><strong>@BatchAssignments.Sum(a => a.Quantity)</strong></td>
+                                    <td></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+
+                        @if (BatchAssignments.Sum(a => a.Quantity) < Quantity)
+                        {
+                            <div class="warning-message">
+                                <FluentIcon Value="@(new Icons.Regular.Size16.Warning())" Color="Color.Warning" />
+                                <span>Atención: Solo se han asignado @BatchAssignments.Sum(a => a.Quantity) de @Quantity unidades.</span>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="warning-message">
+                            <FluentIcon Value="@(new Icons.Regular.Size16.Warning())" Color="Color.Warning" />
+                            <span>Este artículo no tiene lotes asignados.</span>
+                        </div>
+                    }
+                </FluentStack>
+            }
+        </FluentDialogBody>
+        <FluentDialogFooter>
+            <FluentButton Appearance="Appearance.Accent" OnClick="@CloseDialog">Cerrar</FluentButton>
+        </FluentDialogFooter>
+    </FluentDialog>
+}
+
+<style>
+    .batch-info-table {
+        width: 100%;
+        margin-top: 12px;
+        border-collapse: collapse;
+    }
+
+        .batch-info-table th, .batch-info-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .batch-info-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+
+        .batch-info-table tfoot td {
+            font-weight: bold;
+            border-top: 2px solid #ddd;
+        }
+
+    .warning-message {
+        color: #FF8C00;
+        margin-top: 16px;
+        font-size: 14px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+</style>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; } = false;
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public int OrderId { get; set; }
+    [Parameter] public int LineNumber { get; set; }
+    [Parameter] public string ItemCode { get; set; }
+    [Parameter] public int Quantity { get; set; }
+
+    private List<BatchAssignmentDialog.BatchAssignment> BatchAssignments { get; set; } = new List<BatchAssignmentDialog.BatchAssignment>();
+    private Dictionary<string, Batch> BatchDetails { get; set; } = new Dictionary<string, Batch>();
+    private bool IsLoading { get; set; } = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && !string.IsNullOrEmpty(ItemCode))
+        {
+            await LoadBatchAssignments();
+        }
+    }
+
+    private async Task LoadBatchAssignments()
+    {
+        try
+        {
+            IsLoading = true;
+            StateHasChanged();
+
+            // Cargar las asignaciones de batch para esta línea
+            BatchAssignments = await _batchService.GetBatchAssignmentsForOrderLineAsync(OrderId, LineNumber);
+
+            // Cargar la información de todos los batches
+            var allBatches = await _batchService.GetAvailableBatchesAsync();
+            BatchDetails = allBatches.ToDictionary(b => b.BatchId);
+        }
+        catch (Exception)
+        {
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private Batch GetBatchInfo(string batchId)
+    {
+        if (string.IsNullOrEmpty(batchId))
+            return null;
+
+        if (BatchDetails.TryGetValue(batchId, out var batch))
+            return batch;
+
+        return null;
+    }
+
+    private async Task CloseDialog()
+    {
+        await IsOpenChanged.InvokeAsync(false);
+    }
+}
