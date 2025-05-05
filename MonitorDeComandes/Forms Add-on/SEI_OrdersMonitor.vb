@@ -1,14 +1,8 @@
 ﻿Imports System.Collections.Generic
-Imports System.Data
 Imports System.IO
-Imports System.Linq
-Imports System.Net.Http
-Imports System.Numerics
 Imports System.Threading.Tasks
 Imports System.Xml.Linq
-Imports CrystalDecisions.CrystalReports.Engine
 Imports Newtonsoft.Json.Linq
-Imports SAPbobsCOM
 Imports SAPbouiCOM
 Imports SEI.MonitorDeComandes.SEI_AddonEnum
 Imports SEIDOR_SLayer
@@ -135,11 +129,9 @@ Public Class SEI_OrdersMonitor
             Dim cbOperatorSt As ComboBox = Me.Form.Items.Item(FormControls.cbOperatorSt).Specific
             Dim etClient As EditText = Me.Form.Items.Item(FormControls.etClient).Specific
 
-
             Dim orderStatus As String = If(cbOrderSt.Selected IsNot Nothing, cbOrderSt.Selected.Value, "").Trim()
             Dim operatorStatus As String = If(cbOperatorSt.Selected IsNot Nothing, cbOperatorSt.Selected.Value, "").Trim()
             Dim client As String = If(etClient IsNot Nothing, etClient.Value.Trim(), "")
-
 
             Dim query As String = $"SELECT * FROM (
                                     SELECT 
@@ -382,7 +374,6 @@ Public Class SEI_OrdersMonitor
                     Directory.CreateDirectory(basePath)
                 End If
 
-
                 For i As Integer = 0 To grid.Rows.Count - 1
                     If grid.DataTable.GetValue("Send", i).ToString() = "Y" Then
                         isOrderSelected = True
@@ -395,11 +386,10 @@ Public Class SEI_OrdersMonitor
 
                         Dim filePath As String = $"{basePath}Order_{docEntry}_{DateTime.Now:yyyy_MM_dd_HH_mm_ss}.txt"
                         GenerateOrderTxt(order, filePath)
-                        PatchOrder(docEntry, "Sent").Wait()
+                        PatchStatus(docEntry, "Sent").Wait()
 
                     End If
                 Next
-
 
                 If Not isOrderSelected Then
                     SBO_Application.StatusBar.SetText("No order selected. Please select at least one order to send.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
@@ -408,7 +398,6 @@ Public Class SEI_OrdersMonitor
 
                 LoadOrdersDataInGrid()
 
-
             Catch ex As Exception
                 SBO_Application.StatusBar.SetText($"Error: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                 BubbleEvent = False
@@ -416,7 +405,6 @@ Public Class SEI_OrdersMonitor
         End If
 
     End Sub
-
 
     Private Sub HandleBtnCreateInvoices(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
         If pVal.EventType <> BoEventTypes.et_ITEM_PRESSED Then Exit Sub
@@ -435,7 +423,7 @@ Public Class SEI_OrdersMonitor
 
                     If sendChecked = "Y" And orderStatus = "Delivered" Then
                         isOrderSelected = True
-                        PatchOrder(docEntry, "Invoiced").Wait()
+                        PatchStatus(docEntry, "Invoiced").Wait()
                     ElseIf sendChecked = "Y" And orderStatus <> "Delivered" Then
                         SBO_Application.StatusBar.SetText("You cannot create an invoice, there is no delivery created.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                     End If
@@ -454,7 +442,6 @@ Public Class SEI_OrdersMonitor
         End If
     End Sub
 
-
     Private Sub HandleBtnCreateDeliveries(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
         If pVal.EventType <> BoEventTypes.et_ITEM_PRESSED Then Exit Sub
         If Not pVal.BeforeAction Then
@@ -469,12 +456,19 @@ Public Class SEI_OrdersMonitor
 
                     If sendChecked = "Y" And operatorStatus = "C" Then
                         isOrderSelected = True
-                        'Do post delivery. Fer el post de totes les deliveries marcades com a chek si
-                        'una esta mal i les altres no, com actuem?
-                        'Si ha anat be patchorder tal i com esta, sino cridem la funcio pero
-                        'posatn no deliverered sino una altre cosa
-                        'Un cop els deliveries esitiguin fets com o marco perque la noura sapiga que ja pot fer les entregues?
-                        PatchOrder(docEntry, "Delivered").Wait()
+                        Dim delivery = CreateDeliveryObject(docEntry)
+                        PostDelivery(delivery).Wait()
+                        'Do post delivery. Fer el post de totes les deliveries marcades com a chek si                   
+                        'Si ha anat be PatchStatus tal i com esta, sino cridem la funcio pero
+                        'posatn no deliverered error delivering
+                        Dim response = New DeliveryResponse()
+
+                        If response.IsSuccess Then
+                            PatchStatus(docEntry, "Delivered").Wait()
+                        Else
+                            PatchStatus(docEntry, "Error delivering").Wait()
+                        End If
+
                     ElseIf sendChecked = "Y" And operatorStatus <> "C" Then
                         SBO_Application.StatusBar.SetText("You cannot create a delivery, the order is not confirmed.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                     End If
@@ -495,11 +489,165 @@ Public Class SEI_OrdersMonitor
 #End Region
 
 #Region "FUINCIONES GENERALES"
-    Private Async Function PostInvoice(DocEntry As List(Of Integer)) As Task
 
+    Private Function CreateDeliveryObject(docEntry As Integer) As Delivery
+        Try
+            Dim response = Task.Run(Function() m_SBOAddon.oSLConnection.Request("CONF_ORDERS").Filter($"DocEntry eq {docEntry}").GetAsync(Of JObject)()).GetAwaiter().GetResult()
+            If response Is Nothing Then
+                Throw New Exception($"Order with DocEntry {docEntry} not found in CONF_ORDERS")
+            End If
 
+            Dim delivery As New Delivery()
+            delivery.DocEntry = CInt(response("DocEntry"))
+            delivery.CardCode = Task.Run(Function() GetOrderCardCode(CInt(response("DocNum")))).GetAwaiter().GetResult()
+            delivery.DocDate = DateTime.Now.ToString("yyyy-MM-dd")
+            delivery.DocDueDate = DateTime.Now.ToString("yyyy-MM-dd")
+            delivery.Comments = $"Delivery created from confirmed order #{response("DocNum")}"
+
+            Dim linesResponse = Task.Run(Function() m_SBOAddon.oSLConnection.Request("CONF_ORDERLINES").Filter($"DocEntry eq {docEntry}").GetAllAsync(Of JObject)()).GetAwaiter().GetResult()
+            If linesResponse Is Nothing OrElse linesResponse.Count = 0 Then
+                Throw New Exception($"No lines found for order {docEntry} in CONF_ORDERLINES")
+            End If
+
+            For Each lineData As JObject In linesResponse
+                If lineData("LineStatus").ToString() = "C" Then
+                    Dim line As New DeliveryLines()
+                    line.BaseEntry = CInt(response("DocNum"))
+                    line.BaseLine = CInt(lineData("LineNum"))
+                    line.ItemCode = lineData("ItemCode").ToString()
+                    line.Quantity = CDbl(lineData("Quantity"))
+                    If Not String.IsNullOrEmpty(lineData("LotNumber")?.ToString()) Then
+                        Dim batch As New BatchNumber()
+                        batch.BatchNumber = lineData("LotNumber").ToString()
+                        batch.Quantity = CDbl(lineData("Quantity"))
+                        line.BatchNumbers.Add(batch)
+                    End If
+                    delivery.DocumentLines.Add(line)
+                End If
+            Next
+
+            If delivery.DocumentLines.Count = 0 Then
+                Throw New Exception("No confirmed lines were found for delivery creation")
+            End If
+
+            Return delivery
+        Catch ex As Exception
+            SBO_Application.StatusBar.SetText($"Error creating delivery object from UDO: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+            Return Nothing
+        End Try
     End Function
-    Private Async Function PatchOrder(DocEntry As Integer, OrderStatus As String) As Task
+
+    Private Async Function GetOrderCardCode(docNum As Integer) As Task(Of String)
+        Try
+            Dim orderResponse = Await m_SBOAddon.oSLConnection.Request("Orders").Filter($"DocNum eq {docNum}").GetAsync(Of JObject)()
+
+            If orderResponse Is Nothing Then
+                Throw New Exception($"Original order with DocNum {docNum} not found")
+            End If
+
+            Return orderResponse("CardCode").ToString()
+        Catch ex As Exception
+            SBO_Application.StatusBar.SetText($"Error getting CardCode: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+            Return String.Empty
+        End Try
+    End Function
+
+    Private Async Function PostDelivery(delivery As Delivery) As Task(Of DeliveryResponse)
+        Dim response As New DeliveryResponse()
+
+        Try
+            If delivery Is Nothing Then
+                response.IsSuccess = False
+                response.Message = "Delivery object is null"
+                Return response
+            End If
+
+            Try
+                Await m_SBOAddon.oSLConnection.Request("Orders").PostAsync(delivery)
+
+                response.IsSuccess = True
+                response.Message = "Delivery created successfully"
+                SBO_Application.StatusBar.SetText($"Delivery for order #{delivery.DocEntry} created successfully.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
+            Catch slEx As Exception
+                response.IsSuccess = False
+                response.Message = $"Error creating delivery: {slEx.Message}"
+                SBO_Application.StatusBar.SetText(response.Message, BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+            End Try
+
+            Return response
+
+        Catch ex As Exception
+            response.IsSuccess = False
+            response.Message = "Exception when posting delivery: " & ex.Message
+            SBO_Application.StatusBar.SetText(response.Message, BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+            Return response
+        End Try
+    End Function
+
+    Private Async Function PostInvoice(docEntries As List(Of Integer)) As Task
+        Try
+            If docEntries Is Nothing OrElse docEntries.Count = 0 Then
+                SBO_Application.StatusBar.SetText("No orders selected to create invoices.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                Return
+            End If
+
+            Dim successCount As Integer = 0
+            Dim errorCount As Integer = 0
+
+            For Each docEntry As Integer In docEntries
+                Try
+                    Dim order As Order = GetOrder(docEntry)
+                    If order Is Nothing Then
+                        SBO_Application.StatusBar.SetText($"Error: Could not retrieve order {docEntry}.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                        errorCount += 1
+                        Continue For
+                    End If
+
+                    Dim invoice As New With {
+                    .CardCode = order.CardCode,
+                    .DocDate = DateTime.Now.ToString("yyyy-MM-dd"),
+                    .DocDueDate = DateTime.Now.AddDays(30).ToString("yyyy-MM-dd"),
+                    .Comments = $"Invoice created from order #{docEntry}",
+                    .DocumentLines = New List(Of Object)()
+                }
+
+                    For Each line In order.DocumentLines
+                        Dim invoiceLine As New With {
+                        .BaseEntry = docEntry,
+                        .BaseLine = line.LineNum,
+                        .BaseType = 17,
+                        .Quantity = line.Quantity
+                    }
+                        invoice.DocumentLines.Add(invoiceLine)
+                    Next
+
+                    Await m_SBOAddon.oSLConnection.Request("Invoices").PostAsync(invoice)
+
+                    Await PatchStatus(docEntry, "Invoiced")
+
+                    SBO_Application.StatusBar.SetText($"Invoice for order #{docEntry} created successfully.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
+                    successCount += 1
+
+                Catch ex As Exception
+                    SBO_Application.StatusBar.SetText($"Error creating invoice for order #{docEntry}: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                    errorCount += 1
+                End Try
+            Next
+
+            If successCount > 0 AndAlso errorCount = 0 Then
+                SBO_Application.StatusBar.SetText($"All invoices ({successCount}) created successfully.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
+            ElseIf successCount > 0 AndAlso errorCount > 0 Then
+                SBO_Application.StatusBar.SetText($"Created {successCount} invoices with {errorCount} errors.", BoMessageTime.bmt_Medium, BoStatusBarMessageType.smt_Warning)
+            ElseIf successCount = 0 AndAlso errorCount > 0 Then
+                SBO_Application.StatusBar.SetText($"Failed to create any invoices. {errorCount} errors occurred.", BoMessageTime.bmt_Medium, BoStatusBarMessageType.smt_Error)
+            End If
+
+        Catch ex As Exception
+            SBO_Application.StatusBar.SetText($"Error in PostInvoice: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+        End Try
+    End Function
+
+    Private Async Function PatchStatus(DocEntry As Integer, OrderStatus As String) As Task
         Try
             Dim updatedData As New With {
                     Key .U_OrdersStatus = OrderStatus
@@ -747,7 +895,6 @@ Public Class SEI_OrdersMonitor
         End Try
     End Sub
 
-
     Private Function GetOrder(docEntry As Integer) As Order
         Try
             Dim serviceLayer As SLConnection = m_SBOAddon.oSLConnection
@@ -766,12 +913,12 @@ Public Class SEI_OrdersMonitor
          .DocDueDate = If(response("DocDueDate") IsNot Nothing,
                         DateTime.Parse(response("DocDueDate").ToString()),
                         DateTime.MinValue),
-         .Lines = New List(Of OrderLines)()
+         .DocumentLines = New List(Of OrderLines)()
      }
 
             If response("DocumentLines") IsNot Nothing Then
                 For Each line In response("DocumentLines")
-                    order.Lines.Add(New OrderLines With {
+                    order.DocumentLines.Add(New OrderLines With {
                  .LineNum = CInt(line("LineNum")),
                  .ItemCode = line("ItemCode")?.ToString(),
                  .Quantity = CDbl(line("Quantity")),
@@ -790,14 +937,13 @@ Public Class SEI_OrdersMonitor
             Return Nothing
         End Try
     End Function
-
     Private Sub GenerateOrderTxt(order As Order, filePath As String)
         Try
             Using writer As New StreamWriter(filePath)
 
                 writer.WriteLine($"HEADER|{order.DocEntry}|{order.CardCode}|{order.OrderDate:yyyy-MM-dd}|{order.DocDueDate:yyyy-MM-dd}")
 
-                For Each line In order.Lines
+                For Each line In order.DocumentLines
                     writer.WriteLine($"LINE|{order.DocEntry}|{line.LineNum}|{line.ItemCode}|{line.Quantity}")
                 Next
             End Using
@@ -882,8 +1028,6 @@ Public Class SEI_OrdersMonitor
             grid.Columns.Item("Status").Visible = False
         End If
 
-
-
         For i = 0 To grid.Rows.Count - 1
             Dim orderStatus As String = grid.DataTable.GetValue("OrderStatus", i)
             Dim operatorStatus As String = grid.DataTable.GetValue("OperatorStatus", i)
@@ -891,7 +1035,6 @@ Public Class SEI_OrdersMonitor
 
             If status = "Sent" Then
                 grid.CommonSetting.SetRowBackColor(i + 1, RGB(255, 255, 0)) 'YELLOW
-                'jhbgifshgeligfhbwelir
             ElseIf status = "Partially Confirmed" Then
                 grid.CommonSetting.SetRowBackColor(i + 1, RGB(255, 165, 0)) 'ORANGE
             ElseIf status = "Error" Then
@@ -904,8 +1047,6 @@ Public Class SEI_OrdersMonitor
                 grid.CommonSetting.SetRowBackColor(i + 1, -1)
             End If
         Next
-
-
 
         grid.DataTable.LoadSerializedXML(SAPbouiCOM.BoDataTableXmlSelect.dxs_DataOnly, xmlDoc.ToString())
         grid.AutoResizeColumns()
