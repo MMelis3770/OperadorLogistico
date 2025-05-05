@@ -62,10 +62,10 @@ Public Class SEI_OrdersMonitor
                 Select Case pVal.ItemUID
                     Case FormControls.btnSend
                         HandleBtnSend(pVal, BubbleEvent)
-                    Case FormControls.btnCreateInvoice
-                        HandleBtnCreateInvoices(pVal, BubbleEvent)
                     Case FormControls.btnCreateDelivery
                         HandleBtnCreateDeliveries(pVal, BubbleEvent)
+                    Case FormControls.btnCreateInvoice
+                        HandleBtnCreateInvoices(pVal, BubbleEvent)
                     Case FormControls.btnFilter
                         HandleBtnFilter(pVal, BubbleEvent)
                 End Select
@@ -406,42 +406,6 @@ Public Class SEI_OrdersMonitor
 
     End Sub
 
-    Private Sub HandleBtnCreateInvoices(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
-        If pVal.EventType <> BoEventTypes.et_ITEM_PRESSED Then Exit Sub
-        If Not pVal.BeforeAction Then
-            Try
-                Dim grid As SAPbouiCOM.Grid = Me.Form.Items.Item(FormControls.grid).Specific
-                Dim isOrderSelected As Boolean = False
-                Dim docEntries As New List(Of Integer)
-                For i As Integer = 0 To grid.Rows.Count - 1
-
-                    Dim sendChecked As String = grid.DataTable.GetValue("Send", i)
-                    Dim docEntry As Integer = grid.DataTable.GetValue("DocEntry", i)
-                    Dim orderStatus As Integer = grid.DataTable.GetValue("OrderStatus", i)
-
-                    docEntries.Add(docEntry)
-
-                    If sendChecked = "Y" And orderStatus = "Delivered" Then
-                        isOrderSelected = True
-                        PatchStatus(docEntry, "Invoiced").Wait()
-                    ElseIf sendChecked = "Y" And orderStatus <> "Delivered" Then
-                        SBO_Application.StatusBar.SetText("You cannot create an invoice, there is no delivery created.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                    End If
-                Next
-                If Not isOrderSelected Then
-                    SBO_Application.StatusBar.SetText("No order selected. Please select at least one order to create it's invoice.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                    Exit Sub
-                End If
-
-                PostInvoice(docEntries).Wait()
-                LoadOrdersDataInGrid()
-            Catch ex As Exception
-                SBO_Application.StatusBar.SetText($"{ex.Message}")
-            End Try
-
-        End If
-    End Sub
-
     Private Sub HandleBtnCreateDeliveries(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
         If pVal.EventType <> BoEventTypes.et_ITEM_PRESSED Then Exit Sub
         If Not pVal.BeforeAction Then
@@ -486,6 +450,43 @@ Public Class SEI_OrdersMonitor
 
         End If
     End Sub
+    Private Sub HandleBtnCreateInvoices(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
+        If pVal.EventType <> BoEventTypes.et_ITEM_PRESSED Then Exit Sub
+        If Not pVal.BeforeAction Then
+            Try
+                Dim grid As SAPbouiCOM.Grid = Me.Form.Items.Item(FormControls.grid).Specific
+                Dim isOrderSelected As Boolean = False
+                Dim docEntries As New List(Of Integer)
+                For i As Integer = 0 To grid.Rows.Count - 1
+
+                    Dim sendChecked As String = grid.DataTable.GetValue("Send", i)
+                    Dim docEntry As Integer = grid.DataTable.GetValue("DocEntry", i)
+                    Dim orderStatus As Integer = grid.DataTable.GetValue("OrderStatus", i)
+
+                    docEntries.Add(docEntry)
+
+                    If sendChecked = "Y" And orderStatus = "Delivered" Then
+                        isOrderSelected = True
+                        PatchStatus(docEntry, "Invoiced").Wait()
+                    ElseIf sendChecked = "Y" And orderStatus <> "Delivered" Then
+                        SBO_Application.StatusBar.SetText("You cannot create an invoice, there is no delivery created.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                    End If
+                Next
+                If Not isOrderSelected Then
+                    SBO_Application.StatusBar.SetText("No order selected. Please select at least one order to create it's invoice.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                    Exit Sub
+                End If
+
+                PostInvoice(docEntries).Wait()
+                LoadOrdersDataInGrid()
+            Catch ex As Exception
+                SBO_Application.StatusBar.SetText($"{ex.Message}")
+            End Try
+
+        End If
+    End Sub
+
+
 #End Region
 
 #Region "FUINCIONES GENERALES"
@@ -503,6 +504,7 @@ Public Class SEI_OrdersMonitor
             delivery.DocDate = DateTime.Now.ToString("yyyy-MM-dd")
             delivery.DocDueDate = DateTime.Now.ToString("yyyy-MM-dd")
             delivery.Comments = $"Delivery created from confirmed order #{response("DocNum")}"
+            delivery.WarehouseCode = "01"
 
             Dim linesResponse = Task.Run(Function() m_SBOAddon.oSLConnection.Request("CONF_ORDERLINES").Filter($"DocEntry eq {docEntry}").GetAllAsync(Of JObject)()).GetAwaiter().GetResult()
             If linesResponse Is Nothing OrElse linesResponse.Count = 0 Then
