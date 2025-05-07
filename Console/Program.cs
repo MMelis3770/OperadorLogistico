@@ -1,5 +1,4 @@
 ﻿using System.Reflection;
-using B1SLayer;
 using Console.Processes;
 using DatabaseConnection;
 using Microsoft.Extensions.Configuration;
@@ -9,19 +8,26 @@ using Microsoft.Extensions.Logging;
 
 namespace OperadorLogistico.Console
 {
-    public interface ISapDatabaseConnection : IDatabaseConnection { }
-    public interface ILogisticOperatorDatabaseConnection : IDatabaseConnection { }
-
-    public class SapDatabaseConnection : SQLDatabaseConnection, ISapDatabaseConnection
+    public interface ISqlServerConnection : IDatabaseConnection
     {
-        public SapDatabaseConnection(string server, string company, string user, string password)
-            : base(server, company, user, password) { }
+        string GetSapDbName();
+        string GetLogisticDbName();
     }
 
-    public class LogisticOperatorDatabaseConnection : SQLDatabaseConnection, ILogisticOperatorDatabaseConnection
+    public class SqlServerConnection : SQLDatabaseConnection, ISqlServerConnection
     {
-        public LogisticOperatorDatabaseConnection(string server, string company, string user, string password)
-            : base(server, company, user, password) { }
+        private readonly string _sapDbName;
+        private readonly string _logisticDbName;
+
+        public SqlServerConnection(string server, string sapDbName, string logisticDbName, string user, string password)
+            : base(server, "", user, password)
+        {
+            _sapDbName = sapDbName;
+            _logisticDbName = logisticDbName;
+        }
+
+        public string GetSapDbName() => _sapDbName;
+        public string GetLogisticDbName() => _logisticDbName;
     }
 
     public class Program
@@ -48,37 +54,17 @@ namespace OperadorLogistico.Console
                             configure.AddDebug();
                         });
 
-                        services.AddSingleton<SLConnection>(sp =>
+                        services.AddSingleton<ISqlServerConnection>(sp =>
                         {
-                            return new SLConnection(
-                                context.Configuration.GetSection("SapSettings").GetValue<string>("ServiceUrl"),
-                                context.Configuration.GetSection("SapSettings").GetValue<string>("CompanyDb"),
-                                context.Configuration.GetSection("SapSettings").GetValue<string>("Username"),
-                                context.Configuration.GetSection("SapSettings").GetValue<string>("Password")
+                            return new SqlServerConnection(
+                                context.Configuration.GetSection("DBSettings").GetValue<string>("ServiceUrl"),
+                                context.Configuration.GetSection("DBSettings").GetValue<string>("SAPCompanyDb"),
+                                context.Configuration.GetSection("DBSettings").GetValue<string>("LOCompanyDb"),
+                                context.Configuration.GetSection("DBSettings").GetValue<string>("Username"),
+                                context.Configuration.GetSection("DBSettings").GetValue<string>("Password")
                             );
                         });
 
-                        services.AddSingleton<ISapDatabaseConnection>(sp =>
-                        {
-                            return new SapDatabaseConnection(
-                                context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("ServiceUrl"),
-                                context.Configuration.GetSection("SapSettings").GetValue<string>("CompanyDb"),
-                                context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("Username"),
-                                context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("Password")
-                            );
-                        });
-
-                        services.AddSingleton<ILogisticOperatorDatabaseConnection>(sp =>
-                        {
-                            return new LogisticOperatorDatabaseConnection(
-                                context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("ServiceUrl"),
-                                context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("CompanyDb"),
-                                context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("Username"),
-                                context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("Password")
-                            );
-                        });
-
-                        //services.AddSingleton<OrderManagement>();
                         services.AddSingleton<InventorySync>();
                         services.AddHostedService<ProcessWorker>();
                     })
