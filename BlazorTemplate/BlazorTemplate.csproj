@@ -24,6 +24,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="DatabaseConnection">
+      <HintPath>Libraries\DatabaseConnection.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Update="Components\Pages\TestTemplate.razor">
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Content>

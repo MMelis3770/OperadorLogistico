@@ -1,12 +1,22 @@
 using BlazorTemplate.Interfaces;
 using BlazorTemplate.Services;
 using BlazorTemplateService;
+using DatabaseConnection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.FluentUI.AspNetCore.Components;
 namespace BlazorTemplate;
+
+public interface ILogisticOperatorDatabaseConnection : IDatabaseConnection { }
+
+public class LogisticOperatorDatabaseConnection : SQLDatabaseConnection, ILogisticOperatorDatabaseConnection
+{
+    public LogisticOperatorDatabaseConnection(string server, string company, string user, string password)
+        : base(server, company, user, password) { }
+}
+
 internal static class Program
 {
     [STAThread]
@@ -45,6 +55,16 @@ internal static class Program
 
                 // Registrar el servicio de batches
                 services.AddSingleton<IBatchService, BatchService>();
+
+                services.AddSingleton<ILogisticOperatorDatabaseConnection>(sp =>
+                {
+                    return new LogisticOperatorDatabaseConnection(
+                        context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("ServiceUrl"),
+                        context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("CompanyDb"),
+                        context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("Username"),
+                        context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("Password")
+                    );
+                });
             })
             .ConfigureLogging((context, logging) =>
             {
