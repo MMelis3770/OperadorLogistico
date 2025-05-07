@@ -1,5 +1,7 @@
 Option Explicit On
 Imports System.Linq
+Imports System.ServiceModel
+Imports System.Xml.Linq
 Imports SAPbobsCOM
 Imports SAPbobsCOM.BoFieldTypes
 Imports SAPbobsCOM.BoFldSubTypes
@@ -36,6 +38,7 @@ Public Class SEI_CreateTables
 #End Region
 
 #Region "Tables Fields and Objects"
+
     Public Sub CreateSEICONFIG()
         Const sTable As String = "@SEICONFIG"
         Const sDescritpion As String = "Add-on Configuration"
@@ -64,6 +67,8 @@ Public Class SEI_CreateTables
                       -1)
     End Sub
 
+
+
 #End Region
 
 #Region "Aux Functions"
@@ -90,7 +95,7 @@ Public Class SEI_CreateTables
                               ByVal Field As String,
                               ByVal Description As String,
                               ByVal Type As SAPbobsCOM.BoFieldTypes,
-                              ByVal Size As Integer,
+                              Optional ByVal Size As Integer = 0,
                               Optional ByVal SubType As SAPbobsCOM.BoFldSubTypes = st_None,
                               Optional ByVal DefaultValue As String = "",
                               Optional ByVal CodesValidValues() As String = Nothing,
@@ -220,10 +225,10 @@ Public Class SEI_CreateTables
                     If Not IsNothing(Array_FormFields) Then
                         With .FormColumns
                             .SonNumber = 0
-                            .FormColumnAlias = "Code" 'El Code és obligatori
+                            .FormColumnAlias = "DocEntry"
                             For iChild = LBound(Array_FormFields) To UBound(Array_FormFields)
                                 Dim item = Array_FormFields(iChild)
-                                If item.Item1.Trim.ToUpper <> "CODE" Then
+                                If item.Item1.Trim.ToUpper <> "DOCENTRY" Then
                                     .Add()
                                     .FormColumnAlias = item.Item1
                                     .SonNumber = item.Item2
@@ -322,8 +327,8 @@ Public Class SEI_CreateTables
         mGlobals.LiberarObjCOM(oRecordset, True)
     End Function
 
-#End Region
 
+#End Region
 #Region "Modify/Delete UserFields"
     Public Sub RemoveUserField(ByVal Table As String,
                            ByVal Field As String)
@@ -342,6 +347,7 @@ Public Class SEI_CreateTables
         '
         mGlobals.LiberarObjCOM(oUserFieldsMD, True)
     End Sub
+
 #End Region
 
 End Class

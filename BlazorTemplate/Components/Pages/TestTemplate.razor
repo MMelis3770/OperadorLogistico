@@ -5,8 +5,11 @@
 @using BlazorTemplate.Models
 @using BlazorTemplate.Interfaces
 @using Microsoft.FluentUI.AspNetCore.Components
+@using BlazorTemplate.Services
 @inject IDialogService _dialogService
 @inject IOrderService _orderService
+@inject ISelectedOrdersService _selectedOrdersService
+@inject NavigationManager _navigationManager
 @page "/TestTemplate"
 @implements IDisposable
 
@@ -15,7 +18,13 @@
 
 <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
     <FluentButton Appearance="Appearance.Accent" OnClick="@LoadOrdersFromFiles">Cargar Comandas</FluentButton>
-    <FluentButton Appearance="Appearance.Accent">Subir Comandas</FluentButton>
+    <FluentSpacer />
+
+    <FluentButton Appearance="Appearance.Accent" Style="margin-right: 40px" BackgroundColor="#28a745"
+                  OnClick="@(async () => await NavigateToBatchWithSelected())">
+        Subir Comandas
+    </FluentButton>
+
     @if (isLoading)
     {
         <FluentProgressRing />
@@ -23,43 +32,71 @@
     }
 </FluentStack>
 
-<FluentDataGrid Items="@orders" TGridItem="Order" style="height: 600px" Pagination="@pagination" RowClicked="HandleRowClick">
-    <PropertyColumn Property="@(o => o.ID)" Sortable="true" />
-    <PropertyColumn Property="@(o => o.Client)" Sortable="true" />
-    <PropertyColumn Property="@(o => o.Date)" Format="yyyy-MM-dd" Sortable="true" />
-    <PropertyColumn Property="@(o => o.Expiration)" Format="yyyy-MM-dd" Sortable="true" />
-    <TemplateColumn Title="">
-        <ChildContent>
-            <div @onclick="@(() => ToggleCheckedState(context.ID))" @onclick:stopPropagation="true" style="cursor: pointer;">
-                @if (IsOrderChecked(context.ID))
-                {
-                    <FluentIcon Value="@(new Icons.Regular.Size24.CheckboxChecked())" Color="Color.Accent" />
-                }
-                else
-                {
-                    <FluentIcon Value="@(new Icons.Regular.Size24.CheckboxUnchecked())" Color="Color.Accent" />
-                }
-            </div>
-        </ChildContent>
-    </TemplateColumn>
-</FluentDataGrid>
+<!-- Contenedor principal -->
+<div class="grid-and-pagination-container">
+    <!-- Contenedor del grid -->
+    <div class="fixed-height-grid-container">
+        <FluentDataGrid Items="@orders" TGridItem="Order" Pagination="@pagination" Class="fixed-row-grid">
 
-<FluentPaginator State="@pagination" />
+            <PropertyColumn Property="@(o => o.ID)" Sortable="true" />
+            <PropertyColumn Property="@(o => o.Client)" Sortable="true" />
+            <PropertyColumn Property="@(o => o.Date)" Format="yyyy-MM-dd" Sortable="true" />
+            <PropertyColumn Property="@(o => o.Expiration)" Format="yyyy-MM-dd" Sortable="true" />
+            <PropertyColumn Property="@(o => o.LineCount)" Title="Líneas" Sortable="true" />
+            <TemplateColumn Title="">
+                <ChildContent>
+                    <button @onclick="@(() => HandleRowClick(context))"
+                            style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; display: flex; justify-content: center; align-items: center;">
+                        <FluentIcon Value="@(new Icons.Regular.Size20.Eye())" Color="Color.Accent" />
+                    </button>
+                </ChildContent>
+            </TemplateColumn>
+            <TemplateColumn Title="">
+                <ChildContent>
+                    <div @onclick="@(() => ToggleCheckedState(context.ID))" @onclick:stopPropagation="true" style="cursor: pointer;">
+                        @if (IsOrderChecked(context.ID))
+                        {
+                            <FluentIcon Value="@(new Icons.Regular.Size24.CheckboxChecked())" Color="Color.Accent" />
+                        }
+                        else
+                        {
+                            <FluentIcon Value="@(new Icons.Regular.Size24.CheckboxUnchecked())" Color="Color.Accent" />
+                        }
+                    </div>
+                </ChildContent>
+            </TemplateColumn>
+        </FluentDataGrid>
+    </div>
+
+    <!-- Contenedor para el contador y paginador -->
+    <div class="paginator-container">
+        <div class="left-section"></div>
+        <div class="right-section">
+            <FluentPaginator State="@pagination" />
+        </div>
+    </div>
+</div>
 
 @if (selectedOrder != null)
 {
-    <h2>Detalle de Comanda: @selectedOrder.ID</h2>
-    <FluentDataGrid Items="@selectedOrderItems" TGridItem="OrderLineItem">
-        <PropertyColumn Property="@(li => li.LineNumber)" Title="Línea" Sortable="true" />
-        <PropertyColumn Property="@(li => li.ItemCode)" Title="Artículo" Sortable="true" />
-        <PropertyColumn Property="@(li => li.Quantity)" Title="Cantidad" Sortable="true" />
-    </FluentDataGrid>
+    <h2>Detalle de Comanda: @selectedOrder.ID - @selectedOrder.Client</h2>
 
-    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8" Style="margin-top: 16px;">
-        <FluentButton Appearance="Appearance.Accent" OnClick="@(() => ConfirmOrderToSAP(selectedOrder.ID))">
-            Confirmar en SAP
-        </FluentButton>
-    </FluentStack>
+    @if (selectedOrderItems != null && selectedOrderItems.Any())
+    {
+        <div class="detail-container">
+            <FluentDataGrid Items="@selectedOrderItems" TGridItem="OrderLineItem" Class="detail-grid">
+                <PropertyColumn Property="@(li => li.LineNumber + 1)" Title="Línea" Sortable="true" />
+                <PropertyColumn Property="@(li => li.ItemCode)" Title="Artículo" Sortable="true" />
+                <PropertyColumn Property="@(li => li.Quantity)" Title="Cantidad" Sortable="true" />
+            </FluentDataGrid>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info" style="margin-top: 20px">
+            No hay líneas disponibles para esta comanda.
+        </div>
+    }
 }
 
 @code {
@@ -79,32 +116,10 @@
 
     protected override void OnInitialized()
     {
-        // Set up initial data
-        orders = new[]
-        {
-            new Order(10895, "Jean Martin", new DateOnly(1985, 3, 16), new DateOnly(2019, 2, 16), 0),
-            new Order(10944, "António Langa", new DateOnly(1991, 12, 1), new DateOnly(2020, 2, 16), 0),
-            new Order(11203, "Julie Smith", new DateOnly(1958, 10, 10), new DateOnly(2021, 2, 16), 0),
-            new Order(11205, "Nur Sari", new DateOnly(1922, 4, 27), new DateOnly(2022, 2, 16), 0),
-            new Order(11898, "Jose Hernandez", new DateOnly(2011, 5, 3), new DateOnly(2023, 2, 16), 0),
-            new Order(12130, "Kenji Sato", new DateOnly(2004, 1, 9), new DateOnly(2024, 2, 16), 0),
-        }.AsQueryable();
+        base.OnInitialized();
 
-        // Initialize all orders as unchecked
-        foreach (var order in orders)
-        {
-            checkedOrders[order.ID] = false;
-        }
-
-        // Set up a timer to check for new files every 60 seconds
-        // refreshTimer = new System.Threading.Timer(_ =>
-        // {
-        //     InvokeAsync(async () =>
-        //     {
-        //         await LoadOrdersFromFiles();
-        //         StateHasChanged();
-        //     });
-        // }, null, TimeSpan.Zero, TimeSpan.FromSeconds(60));
+        // Limpiar órdenes seleccionadas anteriores al cargar esta página
+        _selectedOrdersService.ClearSelectedOrders();
     }
 
     // Method to check if an order is checked
@@ -127,6 +142,33 @@
         StateHasChanged();
     }
 
+    // Método para navegar a LayoutBatch con las órdenes seleccionadas
+    private async Task NavigateToBatchWithSelected()
+    {
+        // Obtener IDs de órdenes seleccionadas
+        var selectedOrderIds = checkedOrders
+            .Where(kvp => kvp.Value && kvp.Key > 0)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        if (selectedOrderIds.Count == 0)
+        {
+            await _dialogService.ShowInfoAsync("No hay comandas seleccionadas", "Información");
+            return;
+        }
+
+        // Obtener las órdenes completas usando los IDs
+        var selectedOrdersData = processedOrders
+            .Where(o => selectedOrderIds.Contains(o.ID))
+            .ToList();
+
+        // Guardar en el servicio compartido
+        _selectedOrdersService.SetSelectedOrders(selectedOrdersData);
+
+        // Navegar a la página de Batch
+        _navigationManager.NavigateTo("/LayoutBatch");
+    }
+
     private async Task LoadOrdersFromFiles()
     {
         if (isLoading) return;
@@ -136,38 +178,40 @@
             isLoading = true;
             StateHasChanged();
 
-            // Use the OrderService to get orders
+            // Usar OrderService para obtener órdenes
             processedOrders = await _orderService.GetOrdersAsync();
 
-            // Convert the processed orders to the format expected by the grid
+            // Convertir a formato para la grid
             var orderList = processedOrders.Select(o => new Order(
                 o.ID,
                 o.Client,
                 DateOnly.FromDateTime(o.OrderDate),
                 DateOnly.FromDateTime(o.DueDate),
-                o.LineItems.Count
+                o.LineItems.Count  // Mostrar número de líneas
             )).ToList();
 
-            // Combine with existing orders, avoiding duplicates
-            var existingIds = orders.Select(o => o.ID).ToHashSet();
-            var newOrders = orderList.Where(o => !existingIds.Contains(o.ID)).ToList();
-
-            if (newOrders.Any())
+            // Si hay menos órdenes que el tamaño de página, rellenar con filas vacías
+            int itemsToAdd = Math.Max(0, pagination.ItemsPerPage - orderList.Count);
+            for (int i = 0; i < itemsToAdd; i++)
             {
-                orders = orders.Concat(newOrders.AsQueryable()).OrderBy(o => o.ID);
-
-                // Initialize new orders as unchecked
-                foreach (var order in newOrders)
-                {
-                    checkedOrders[order.ID] = false;
-                }
-
-                await _dialogService.ShowInfoAsync($"Se han cargado {newOrders.Count} nuevas comandas.", "Información");
+                // Usar IDs negativos para evitar conflictos de clave
+                orderList.Add(new Order(-i - 1, $"Empty-{i + 1}", new DateOnly(), new DateOnly(), 0));
             }
-            else
+
+            orders = orderList.AsQueryable();
+
+            // Inicializar estado de checkboxes
+            checkedOrders.Clear();
+            foreach (var order in orderList.Where(o => o.ID > 0))
             {
-                await _dialogService.ShowInfoAsync("No se han encontrado nuevas comandas.", "Información");
+                checkedOrders[order.ID] = false;
             }
+
+            // Limpiar la selección actual si existe
+            selectedOrder = null;
+            selectedOrderItems = null;
+
+            await _dialogService.ShowInfoAsync($"Se han cargado {processedOrders.Count} comandas.", "Información");
         }
         catch (Exception ex)
         {
@@ -180,29 +224,37 @@
         }
     }
 
-    private void HandleRowClick(FluentDataGridRow<Order> row)
+    private void HandleRowClick(Order order)
     {
-        if (row.Item is null) return;
+        if (order == null || order.ID <= 0) return;  // Ignorar clics en filas vacías (ID ≤ 0)
 
-        selectedOrder = row.Item;
+        selectedOrder = order;
+        StateHasChanged(); // Forzar actualización para mostrar el encabezado de la sección de detalles
 
-        // Find the corresponding processed order data
+        // Busca en las órdenes procesadas
         var orderData = processedOrders.FirstOrDefault(o => o.ID == selectedOrder.ID);
 
-        if (orderData != null)
+        if (orderData != null && orderData.LineItems.Any())
         {
-            selectedOrderItems = orderData.LineItems
+            // Convertir las líneas al formato para la grid
+            var lineItems = orderData.LineItems
                 .Select(li => new OrderLineItem(
                     li.LineNumber,
                     li.ItemCode,
                     li.Quantity
                 ))
-                .AsQueryable();
+                .ToList();
+
+            selectedOrderItems = lineItems.AsQueryable();
         }
         else
         {
+            // Si no se encuentran líneas, mostrar una colección vacía
             selectedOrderItems = Array.Empty<OrderLineItem>().AsQueryable();
         }
+
+        // Segunda llamada a StateHasChanged para actualizar la grid de líneas
+        StateHasChanged();
     }
 
     private async Task ConfirmOrderToSAP(int orderId)

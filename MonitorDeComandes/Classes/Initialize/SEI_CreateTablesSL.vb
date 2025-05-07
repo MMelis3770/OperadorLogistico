@@ -1,40 +1,24 @@
-﻿Imports System.Collections.Generic
-Imports System.Linq
+﻿Imports System.Linq
 Imports System.Threading.Tasks
-Imports Newtonsoft.Json
 Imports Newtonsoft.Json.Linq
 Imports SAPbobsCOM
 Imports SEIDOR_SLayer
 
 Public Class SEI_CreateTablesSL
 
-#Region "Attributes"
-    Private ReadOnly m_ParentAddon As SEI_Addon
-    Private Enum SLTableType
-        bot_NoObject = 0
-        bot_Document = 1
-        bot_DocumentLines = 2
-        bot_MasterData = 3
-        bot_MasterDataLines = 4
-    End Enum
-#End Region
 
-#Region "Constructor"
-    Public Sub New(ByRef ParentAddon As SEI_Addon)
-        m_ParentAddon = ParentAddon
-    End Sub
-#End Region
+
 
     Public Async Function AddUserTables() As Task
-        Try
-            Console.WriteLine("Starting UDO creation process...")
-            Await CreateUDO()
-        Catch ex As Exception
-            Console.WriteLine($"Error in main process: {ex.Message}")
-            Throw
-        End Try
+        'Await CreateUserDataDefinedField()
+        Await CreateUDO()
+
     End Function
 
+    Private Async Function CreateUserDataDefinedField() As Threading.Tasks.Task
+
+        Await CreateUserDataField("ORDR", "OrdersStatus", "OrdersStatus", BoFieldTypes.db_Alpha, 50)
+    End Function
     Private Async Function CreateUDO() As Task
         Const tableHeader As String = "CONF_ORDERS"
         Const headerDescription As String = "Confirmed Orders Header"
@@ -64,40 +48,27 @@ Public Class SEI_CreateTablesSL
               codesValidValues:=statusCodes, namesValidValues:=statusNames)
             Await CreateUserDataField("@" & tableDetail, "ErrorMsg", "Line Error", BoFieldTypes.db_Alpha, 254)
 
-            '    Dim formFieldsStrArray As String() = {
-            '    "U_DocEntry",
-            '    "U_DocNum",
-            '    "U_Status",
-            '    "U_ConfDate",
-            '    "U_ErrorMsg",
-            '    "U_DocEntry",
-            '    "U_LineNum",
-            '    "U_ItemCode",
-            '    "U_Quantity",
-            '    "U_LotNumber",
-            '    "U_LineStatus",
-            '    "U_ErrorMsg"
-            '}
-
-            '    Dim findFields As String() = {"U_DocEntry", "U_DocNum", "U_Status"}
-
-            Dim srfPath As String = "C:\Users\mcorder\OneDrive - SEIDOR SOLUTIONS S.L\PFG\OperadorLogistico\MonitorDeComandes\Forms .srf\SEI_ConfOrders.srf"
 
             Await CreateUserUDO(
-            name:=tableHeader,
-            description:="Confirmation Orders",
-            logTable:="A" & tableHeader,
-            type:=BoUDOObjType.boud_Document,
-            canFind:=BoYesNoEnum.tYES,
-            defaultForm:=BoYesNoEnum.tNO,
-            fatherMenu:="8765", '43545  -  8765
-            array_ChildTables:={tableDetail},
-            position:=-1,
-            formSRFPath:=srfPath)
-
-            'array_ChildTables:={tableDetail},
-            'array_FindFields:=findFields,
-            'array_FormFields:=formFieldsStrArray,
+                name:=tableHeader,
+                description:="Confirmation Orders",
+                logTable:="A" & tableHeader,
+                type:=BoUDOObjType.boud_Document,
+                canCancel:=BoYesNoEnum.tYES,
+                canClose:=BoYesNoEnum.tYES,
+                defaultForm:=BoYesNoEnum.tNO,
+                canDelete:=BoYesNoEnum.tNO,
+                canFind:=BoYesNoEnum.tYES,
+                canLog:=BoYesNoEnum.tYES,
+                canYearTransfer:=BoYesNoEnum.tNO,
+                manageSeries:=BoYesNoEnum.tYES,
+                fatherMenu:=Nothing,
+                position:=Nothing,                    '
+                array_ChildTables:={tableDetail},
+                array_FindFields:=Nothing,
+                array_FormFields:=Nothing,
+                formSRFPath:=Nothing
+            )
 
             Console.WriteLine("UDO creado exitosamente")
         Catch ex As Exception
@@ -106,24 +77,20 @@ Public Class SEI_CreateTablesSL
         End Try
     End Function
 
-    Private Async Function CreateUserTables(
-        name As String,
-        description As String,
-        iType As BoUTBTableType
-    ) As Task
+    Private Async Function CreateUserTables(name As String, description As String, iType As BoUTBTableType) As Task
         Try
-            Dim response = Await m_ParentAddon.oSLConnection.Request("UserTablesMD").Filter($"TableName eq '{name.Replace("@", "")}'").GetAllAsync(Of Object)()
+            Dim response = Await m_SBOAddon.oSLConnection.Request("UserTablesMD").Filter($"TableName eq '{name.Replace("@", "")}'").GetAllAsync(Of JObject)()
             If response.Count = 0 Then
-                Await m_ParentAddon.oSLConnection.Request("UserTablesMD").PostAsync(New With {
-                    .TableName = name.Replace("@", ""),
-                    .TableDescription = description,
-                    .TableType = iType.ToString()
+                Await m_SBOAddon.oSLConnection.Request("UserTablesMD").PostAsync(New With {
+                    Key .TableName = name.Replace("@", ""),
+                    Key .TableDescription = description,
+                    Key .TableType = iType.ToString()
                 })
             End If
         Catch ex As Exception
-            Console.WriteLine($"Error creating table {name}: {ex.Message}")
-            Throw
+            Console.WriteLine($"Error creating user table: {ex.Message}")
         End Try
+
     End Function
 
     Private Async Function CreateUserDataField(
@@ -142,7 +109,7 @@ Public Class SEI_CreateTablesSL
     Optional mandatory As BoYesNoEnum = BoYesNoEnum.tNO
 ) As Task
         Try
-            Dim response = Await m_ParentAddon.oSLConnection.Request("UserFieldsMD").Filter($"TableName eq '{table}' and Name eq '{field}'").GetAllAsync(Of Object)()
+            Dim response = Await m_SBOAddon.oSLConnection.Request("UserFieldsMD").Filter($"TableName eq '{table}' and Name eq '{field}'").GetAllAsync(Of Object)()
             If response.Count = 0 Then
                 If mandatory = BoYesNoEnum.tYES AndAlso String.IsNullOrEmpty(defaultValue) Then
                     Throw New Exception($"Debe definirse un valor por defecto para el campo '{field}-{description}'")
@@ -163,12 +130,12 @@ Public Class SEI_CreateTablesSL
             }
 
                 Console.WriteLine($"Creating field {field} in table {table}")
-                Await m_ParentAddon.oSLConnection.Request("UserFieldsMD").PostAsync(basicField)
+                Await m_SBOAddon.oSLConnection.Request("UserFieldsMD").PostAsync(basicField)
 
                 If codesValidValues IsNot Nothing AndAlso namesValidValues IsNot Nothing AndAlso codesValidValues.Length > 0 Then
                     Console.WriteLine($"Adding valid values for field {field}")
 
-                    Dim fieldInfo = Await m_ParentAddon.oSLConnection.Request("UserFieldsMD").Filter($"TableName eq '{table}' and Name eq '{field}'").GetAllAsync(Of Object)()
+                    Dim fieldInfo = Await m_SBOAddon.oSLConnection.Request("UserFieldsMD").Filter($"TableName eq '{table}' and Name eq '{field}'").GetAllAsync(Of Object)()
                     If fieldInfo.Count > 0 Then
                         Dim fieldId As String = field
 
@@ -186,7 +153,7 @@ Public Class SEI_CreateTablesSL
                             }
 
                                 Console.WriteLine($"  Adding value {codesValidValues(i)} - {namesValidValues(i)}")
-                                Await m_ParentAddon.oSLConnection.Request(url).PatchAsync(validValue)
+                                Await m_SBOAddon.oSLConnection.Request(url).PatchAsync(validValue)
                                 Console.WriteLine($"  Value added successfully")
                             Catch vvEx As Exception
                                 Console.WriteLine($"  Error adding valid value: {vvEx.Message}")
@@ -226,35 +193,39 @@ Public Class SEI_CreateTablesSL
     Optional formSRFPath As String = Nothing
 ) As Task
         name = name.Replace("@", "").ToUpper()
-        Dim response = Await m_ParentAddon.oSLConnection.Request("UserObjectsMD").Filter($"Code eq '{name}'").GetAllAsync(Of Object)()
+        Dim response = Await m_SBOAddon.oSLConnection.Request("UserObjectsMD").Filter($"Code eq '{name}'").GetAllAsync(Of Object)()
         If response.Count = 0 Then
             Dim userObject = New With {
-                .CanCancel = canCancel.ToString(),
-                .CanClose = canClose.ToString(),
-                .CanCreateDefaultForm = defaultForm.ToString(),
-                .CanDelete = canDelete.ToString(),
-                .CanFind = canFind.ToString(),
-                .CanLog = canLog.ToString(),
-                .CanYearTransfer = canYearTransfer.ToString(),
-                .Code = name,
-                .TableName = name,
-                .LogTableName = logTable,
-                .ObjectType = type.ToString(),
-                .Name = description,
-                .ManageSeries = manageSeries.ToString(),
-                .UseUniqueFormType = BoYesNoEnum.tYES.ToString(),
-                .UserObjectMD_ChildTables = If(array_ChildTables IsNot Nothing, array_ChildTables.Select(Function(t) New With {.TableName = t}).ToList(), Nothing),
-                .FindColumns = If(canFind = BoYesNoEnum.tYES AndAlso array_FindFields IsNot Nothing, array_FindFields.Select(Function(f) New With {.ColumnAlias = f}).ToList(), Nothing),
-                .FormColumns = If(defaultForm = BoYesNoEnum.tYES AndAlso array_FormFields IsNot Nothing, array_FormFields.Where(Function(f) Not f.Trim().ToUpper().Equals("CODE")).Select(Function(f) New With {.FormColumnAlias = f}).Prepend(New With {.FormColumnAlias = "Code"}).ToList(), Nothing),
-                .FormSRF = If(Not String.IsNullOrEmpty(formSRFPath), formSRFPath.Replace("\", "/"), Nothing),
-                .EnableEnhancedForm = BoYesNoEnum.tNO.ToString(),
-                .MenuItem = BoYesNoEnum.tYES.ToString(),
-                .MenuCaption = description,
-                .MenuUID = name,
-                .FatherMenuID = fatherMenu,
-                .Position = position
-            }
-            Await m_ParentAddon.oSLConnection.Request("UserObjectsMD").PostAsync(userObject)
+            .CanCancel = canCancel.ToString(),
+            .CanClose = canClose.ToString(),
+            .CanCreateDefaultForm = defaultForm.ToString(),
+            .CanDelete = canDelete.ToString(),
+            .CanFind = canFind.ToString(),
+            .CanLog = canLog.ToString(),
+            .CanYearTransfer = canYearTransfer.ToString(),
+            .Code = name,
+            .TableName = name,
+            .LogTableName = logTable,
+            .ObjectType = type.ToString(),
+            .Name = description,
+            .ManageSeries = manageSeries.ToString(),
+            .UseUniqueFormType = BoYesNoEnum.tYES.ToString(),
+            .UserObjectMD_ChildTables = If(array_ChildTables IsNot Nothing, array_ChildTables.Select(Function(t) New With {.TableName = t}).ToList(), Nothing),
+            .FindColumns = If(canFind = BoYesNoEnum.tYES AndAlso array_FindFields IsNot Nothing, array_FindFields.Select(Function(f) New With {.ColumnAlias = f}).ToList(), Nothing),
+            .FormColumns = If(defaultForm = BoYesNoEnum.tYES AndAlso array_FormFields IsNot Nothing, array_FormFields.Where(Function(f) Not f.Trim().ToUpper().Equals("CODE")).Select(Function(f) New With {.FormColumnAlias = f}).Prepend(New With {.FormColumnAlias = "Code"}).ToList(), Nothing),
+            .FormSRF = If(Not String.IsNullOrEmpty(formSRFPath), formSRFPath.Replace("\", "/"), Nothing),
+            .EnableEnhancedForm = BoYesNoEnum.tNO.ToString(),
+            .MenuItem = BoYesNoEnum.tYES.ToString(),
+            .MenuCaption = description,
+            .MenuUID = name,
+            .FatherMenuID = fatherMenu,
+            .Position = position
+        }
+
+            Await m_SBOAddon.oSLConnection.Request("UserObjectsMD").PostAsync(userObject)
+            Console.WriteLine($"UDO {name} created successfully")
+        Else
+            Console.WriteLine($"UDO {name} already exists")
         End If
     End Function
 

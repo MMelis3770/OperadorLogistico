@@ -1,0 +1,494 @@
+﻿@using System.Text.Json
+@using Newtonsoft.Json.Linq
+@using System.Reflection
+@using System.IO
+@using System.Text
+@using BlazorTemplate.Models
+@using BlazorTemplate.Interfaces
+@using Microsoft.FluentUI.AspNetCore.Components
+@using BlazorTemplate.Services
+@using BlazorTemplate.Components.Dialog
+@inject IDialogService _dialogService
+@inject IOrderService _orderService
+@inject ISelectedOrdersService _selectedOrdersService
+@inject IBatchService _batchService
+@page "/LayoutBatch"
+@implements IDisposable
+
+<PageTitle>Batch Management</PageTitle>
+<h1>Batch Management</h1>
+
+<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
+    <NavLink href="/TestTemplate" style="text-decoration: none;">
+        <button style="background: none; border: none; padding: 4px; margin: 0; cursor: pointer; display: flex; justify-content: center; align-items: center;">
+            <FluentIcon Value="@(new Icons.Regular.Size24.ArrowUndo())" Color="Color.Accent" />
+        </button>
+    </NavLink>
+    <FluentSpacer />
+    <FluentButton Appearance="Appearance.Accent" Style="margin-right: 40px" BackgroundColor="#28a745" OnClick="@ProcessSelectedOrders">Procesar Comandas</FluentButton>
+    @if (isLoading)
+    {
+        <FluentProgressRing />
+        <span>Cargando comandas...</span>
+    }
+</FluentStack>
+
+<!-- Contenedor principal -->
+<div class="grid-and-pagination-container">
+    <!-- Contenedor del grid -->
+    <div class="fixed-height-grid-container">
+        <FluentDataGrid Items="@orders" TGridItem="Order" Pagination="@pagination" Class="fixed-row-grid">
+
+            <PropertyColumn Property="@(o => o.ID)" Sortable="true" />
+            <PropertyColumn Property="@(o => o.Client)" Sortable="true" />
+            <PropertyColumn Property="@(o => o.Date)" Format="yyyy-MM-dd" Sortable="true" />
+            <PropertyColumn Property="@(o => o.Expiration)" Format="yyyy-MM-dd" Sortable="true" />
+            <PropertyColumn Property="@(o => o.LineCount)" Title="Líneas" Sortable="true" />
+            <TemplateColumn Title="">
+                <ChildContent>
+                    <button @onclick="@(() => HandleRowClick(context))"
+                            style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; display: flex; justify-content: center; align-items: center;">
+                        <FluentIcon Value="@(new Icons.Regular.Size20.Eye())" Color="Color.Accent" />
+                    </button>
+                </ChildContent>
+            </TemplateColumn>
+            <TemplateColumn Title="">
+                <ChildContent>
+                    <button @onclick="@(() => HandleDeleteClick(context))"
+                            style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; display: flex; justify-content: center; align-items: center;">
+                        <FluentIcon Value="@(new Icons.Regular.Size20.Delete())" Color="Color.Accent" />
+                    </button>
+                </ChildContent>
+            </TemplateColumn>
+        </FluentDataGrid>
+    </div>
+
+    <!-- Contenedor para el contador y paginador -->
+    <div class="paginator-container">
+        <div class="left-section"></div>
+        <div class="right-section">
+            <FluentPaginator State="@pagination" />
+        </div>
+    </div>
+</div>
+
+@if (selectedOrder != null)
+{
+    <h2>Detalle de Comanda: @selectedOrder.ID - @selectedOrder.Client</h2>
+
+    @if (selectedOrderItems != null && selectedOrderItems.Any())
+    {
+        <div class="detail-container">
+            <FluentDataGrid Items="@selectedOrderItems" TGridItem="OrderLineItem" Class="detail-grid">
+                <PropertyColumn Property="@(li => li.LineNumber + 1)" Title="Línea" Sortable="true" />
+                <PropertyColumn Property="@(li => li.ItemCode)" Title="Artículo" Sortable="true" />
+                <PropertyColumn Property="@(li => li.Quantity)" Title="Cantidad" Sortable="true" />
+                <TemplateColumn Title="Batch">
+                    <ChildContent>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <button @onclick="@(() => OpenBatchAssignmentDialog(context))"
+                                    style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; display: flex; justify-content: center; align-items: center;"
+                                    title="Editar asignación de lotes">
+                                <FluentIcon Value="@(new Icons.Regular.Size20.Edit())" Color="Color.Accent" />
+                            </button>
+                        </div>
+                    </ChildContent>
+                </TemplateColumn>
+                <TemplateColumn Title="Información">
+                    <ChildContent>
+                        @if (!string.IsNullOrEmpty(context.Batch))
+                        {
+                            <button @onclick="@(() => OpenBatchInfoDialog(context))"
+                                    style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; display: flex; justify-content: center; align-items: center;"
+                                    title="Ver información de lotes asignados">
+                                <FluentIcon Value="@(new Icons.Regular.Size20.SlideSearch())" Color="Color.Accent" />
+                            </button>
+                        }
+                    </ChildContent>
+                </TemplateColumn>
+            </FluentDataGrid>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info" style="margin-top: 20px">
+            No hay líneas disponibles para esta comanda.
+        </div>
+    }
+}
+
+<!-- Componente de diálogo para asignar batch -->
+<BatchAssignmentDialog IsOpen="@isBatchDialogOpen"
+                       IsOpenChanged="@HandleDialogClosed"
+                       OrderId="@currentOrderId"
+                       LineNumber="@currentLineNumber"
+                       ItemCode="@currentItemCode"
+                       Quantity="@currentQuantity"
+                       OnBatchAssigned="@HandleBatchAssigned" />
+
+<!-- Componente de diálogo para información de batch -->
+<BatchInfoDialog IsOpen="@isInfoDialogOpen"
+                 IsOpenChanged="@HandleInfoDialogClosed"
+                 OrderId="@currentOrderId"
+                 LineNumber="@currentLineNumber"
+                 ItemCode="@currentItemCode"
+                 Quantity="@currentQuantity" />
+
+@code {
+    record Order(int ID, string Client, DateOnly Date, DateOnly Expiration, int LineCount);
+    record OrderLineItem(int LineNumber, string ItemCode, int Quantity, string Batch);
+
+    private PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+    private IQueryable<Order> orders;
+    private List<OrderData> processedOrders = new List<OrderData>();
+    private Order selectedOrder;
+    private IQueryable<OrderLineItem> selectedOrderItems;
+    private System.Threading.Timer refreshTimer;
+    private bool isLoading = false;
+
+    // Variables para el diálogo de asignación de batch
+    private bool isBatchDialogOpen = false;
+    // Variables para el diálogo de información de batch
+    private bool isInfoDialogOpen = false;
+
+    private int currentOrderId;
+    private int currentLineNumber;
+    private string currentItemCode;
+    private int currentQuantity;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        // Cargar órdenes seleccionadas al inicializar
+        await LoadSelectedOrders();
+    }
+
+    // Cargar las órdenes seleccionadas desde el servicio compartido
+    private async Task LoadSelectedOrders()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            // Obtener las órdenes del servicio compartido
+            var selectedOrdersData = _selectedOrdersService.SelectedOrders;
+
+            if (selectedOrdersData != null && selectedOrdersData.Any())
+            {
+                processedOrders = selectedOrdersData;
+
+                // Convertir a formato para la grid
+                var orderList = processedOrders.Select(o => new Order(
+                    o.ID,
+                    o.Client,
+                    DateOnly.FromDateTime(o.OrderDate),
+                    DateOnly.FromDateTime(o.DueDate),
+                    o.LineItems.Count
+                )).ToList();
+
+                orders = orderList.AsQueryable();
+
+                // Mostrar mensaje informativo
+                await _dialogService.ShowInfoAsync($"Se han cargado {processedOrders.Count} comandas seleccionadas.", "Información");
+            }
+            else
+            {
+                // Si no hay órdenes seleccionadas, mostrar grid vacío
+                orders = new List<Order>().AsQueryable();
+                await _dialogService.ShowInfoAsync("No hay comandas seleccionadas para procesar.", "Información");
+            }
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowErrorAsync($"Error al cargar comandas seleccionadas: {ex.Message}", "Error");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void HandleRowClick(Order order)
+    {
+        if (order == null || order.ID <= 0) return;  // Ignorar clics en filas vacías (ID ≤ 0)
+
+        selectedOrder = order;
+        StateHasChanged(); // Forzar actualización para mostrar el encabezado de la sección de detalles
+
+        // Busca en las órdenes procesadas
+        var orderData = processedOrders.FirstOrDefault(o => o.ID == selectedOrder.ID);
+
+        if (orderData != null && orderData.LineItems.Any())
+        {
+            // Convertir las líneas al formato para la grid
+            var lineItems = orderData.LineItems
+                .Select(li => new OrderLineItem(
+                    li.LineNumber,
+                    li.ItemCode,
+                    li.Quantity,
+                    li.Batch
+                ))
+                .ToList();
+
+            selectedOrderItems = lineItems.AsQueryable();
+        }
+
+        // Segunda llamada a StateHasChanged para actualizar la grid de líneas
+        StateHasChanged();
+    }
+
+    private async Task HandleDeleteClick(Order order)
+    {
+        if (order == null || order.ID <= 0) return;  // Ignorar clics en filas vacías
+
+        var dialogResult = await _dialogService.ShowConfirmationAsync(
+            $"¿Está seguro que desea eliminar la comanda {order.ID}?",
+            "Confirmar eliminación");
+
+        var result = await dialogResult.Result;
+        if (result.Cancelled)
+        {
+            return; // Usuario canceló
+        }
+
+        // Eliminar de processedOrders
+        processedOrders.RemoveAll(o => o.ID == order.ID);
+
+        // Actualizar la vista
+        var orderList = processedOrders.Select(o => new Order(
+            o.ID,
+            o.Client,
+            DateOnly.FromDateTime(o.OrderDate),
+            DateOnly.FromDateTime(o.DueDate),
+            o.LineItems.Count
+        )).ToList();
+
+        orders = orderList.AsQueryable();
+
+        // Actualizar el servicio compartido
+        _selectedOrdersService.SetSelectedOrders(processedOrders);
+
+        // Limpiar selección si el orden eliminado era el seleccionado
+        if (selectedOrder != null && selectedOrder.ID == order.ID)
+        {
+            selectedOrder = null;
+            selectedOrderItems = null;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task ProcessSelectedOrders()
+    {
+        if (processedOrders == null || !processedOrders.Any())
+        {
+            await _dialogService.ShowInfoAsync("No hay comandas para procesar.", "Información");
+            return;
+        }
+
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            // Verificar si todas las órdenes tienen batches asignados
+            List<int> ordersWithMissingBatches = new List<int>();
+            foreach (var order in processedOrders)
+            {
+                bool allAssigned = await _batchService.AllOrderLinesHaveBatchesAsync(order.ID);
+                if (!allAssigned)
+                {
+                    ordersWithMissingBatches.Add(order.ID);
+                }
+            }
+
+            // Si hay órdenes con batches sin asignar, mostrar diálogo de advertencia
+            if (ordersWithMissingBatches.Any())
+            {
+                var message = new StringBuilder();
+                message.AppendLine("Las siguientes comandas tienen productos sin lotes asignados:");
+                foreach (var orderId in ordersWithMissingBatches)
+                {
+                    message.AppendLine($"- Comanda {orderId}");
+                }
+                message.AppendLine("\n¿Desea continuar y asignar lotes automáticamente?");
+
+                var dialogResult = await _dialogService.ShowConfirmationAsync(
+                    message.ToString(),
+                    "Lotes no asignados");
+
+                var result = await dialogResult.Result;
+                if (result.Cancelled)
+                {
+                    isLoading = false;
+                    StateHasChanged();
+                    return; // Usuario canceló
+                }
+
+                // Asignar batches automáticamente a las órdenes que lo necesitan
+                foreach (var orderId in ordersWithMissingBatches)
+                {
+                    await _batchService.AutoAssignBatchesToOrderAsync(orderId);
+                }
+            }
+
+            // Mostrar resumen de las órdenes a procesar
+            var summary = new StringBuilder();
+            summary.AppendLine($"Se procesarán {processedOrders.Count} comandas:");
+            foreach (var order in processedOrders)
+            {
+                summary.AppendLine($"- Orden {order.ID}: {order.Client}, {order.LineItems.Count} líneas");
+            }
+
+            // Confirmación antes de procesar
+            var processDialogResult = await _dialogService.ShowConfirmationAsync(
+                summary.ToString(),
+                "Confirmar Procesamiento");
+
+            var processResult = await processDialogResult.Result;
+            if (processResult.Cancelled)
+            {
+                isLoading = false;
+                StateHasChanged();
+                return;
+            }
+
+            // Simulación de procesamiento con progreso
+            int totalOrders = processedOrders.Count;
+            for (int i = 0; i < totalOrders; i++)
+            {
+                var order = processedOrders[i];
+                await Task.Delay(500); // Simulación de procesamiento por orden
+
+                // Opcional: confirmar cada orden en SAP
+                bool sapResult = await _orderService.ConfirmOrderToSAP(order.ID);
+                if (!sapResult)
+                {
+                    await _dialogService.ShowWarningAsync($"Advertencia: La orden {order.ID} no se pudo confirmar en SAP.", "Advertencia");
+                }
+            }
+
+            // Mostrar mensaje de éxito
+            await _dialogService.ShowInfoAsync($"Se han procesado {processedOrders.Count} comandas con éxito.", "Éxito");
+
+            // Limpiar después de procesar
+            processedOrders.Clear();
+            _selectedOrdersService.ClearSelectedOrders();
+            orders = new List<Order>().AsQueryable();
+            selectedOrder = null;
+            selectedOrderItems = null;
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowErrorAsync($"Error al procesar comandas: {ex.Message}", "Error");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    // Método para abrir el diálogo de asignación de batch
+    private void OpenBatchAssignmentDialog(OrderLineItem lineItem)
+    {
+        if (lineItem == null || selectedOrder == null) return;
+
+        currentOrderId = selectedOrder.ID;
+        currentLineNumber = lineItem.LineNumber;
+        currentItemCode = lineItem.ItemCode;
+        currentQuantity = lineItem.Quantity;
+
+        isBatchDialogOpen = true;
+        StateHasChanged();
+    }
+
+    // Método para abrir el diálogo de información de batch
+    private void OpenBatchInfoDialog(OrderLineItem lineItem)
+    {
+        if (lineItem == null || selectedOrder == null) return;
+        if (string.IsNullOrEmpty(lineItem.Batch)) return; // Solo mostrar información si hay lotes asignados
+
+        currentOrderId = selectedOrder.ID;
+        currentLineNumber = lineItem.LineNumber;
+        currentItemCode = lineItem.ItemCode;
+        currentQuantity = lineItem.Quantity;
+
+        isInfoDialogOpen = true;
+        StateHasChanged();
+    }
+
+    // Método para manejar el cierre del diálogo de asignación
+    private void HandleDialogClosed(bool isOpen)
+    {
+        isBatchDialogOpen = isOpen;
+        StateHasChanged();
+    }
+
+    // Método para manejar el cierre del diálogo de información
+    private void HandleInfoDialogClosed(bool isOpen)
+    {
+        isInfoDialogOpen = isOpen;
+        StateHasChanged();
+    }
+
+    // Método para manejar la asignación exitosa de un batch
+    private async Task HandleBatchAssigned(bool success)
+    {
+        if (success)
+        {
+            // Actualizar la vista de detalle
+            if (selectedOrder != null)
+            {
+                // Recargar los detalles de la orden seleccionada
+                var orderData = processedOrders.FirstOrDefault(o => o.ID == selectedOrder.ID);
+                if (orderData != null && orderData.LineItems.Any())
+                {
+                    // Convertir las líneas al formato para la grid
+                    var lineItems = orderData.LineItems
+                        .Select(li => new OrderLineItem(
+                            li.LineNumber,
+                            li.ItemCode,
+                            li.Quantity,
+                            li.Batch
+                        ))
+                        .ToList();
+
+                    selectedOrderItems = lineItems.AsQueryable();
+                    StateHasChanged();
+                }
+            }
+
+            await _dialogService.ShowInfoAsync("Lote asignado correctamente.", "Éxito");
+        }
+    }
+
+    private async Task ConfirmOrderToSAP(int orderId)
+    {
+        try
+        {
+            bool result = await _orderService.ConfirmOrderToSAP(orderId);
+
+            if (result)
+            {
+                await _dialogService.ShowInfoAsync($"Orden {orderId} confirmada en SAP con éxito.", "Confirmación");
+            }
+            else
+            {
+                await _dialogService.ShowErrorAsync($"No se pudo confirmar la orden {orderId} en SAP.", "Error");
+            }
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowErrorAsync($"Error al confirmar la orden en SAP: {ex.Message}", "Error");
+        }
+    }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
+    }
+}

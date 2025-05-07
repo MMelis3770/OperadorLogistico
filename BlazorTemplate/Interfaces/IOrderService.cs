@@ -1,5 +1,4 @@
 ﻿using BlazorTemplate.Models;
-
 namespace BlazorTemplate.Interfaces
 {
     public interface IOrderService

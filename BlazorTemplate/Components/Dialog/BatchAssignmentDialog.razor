@@ -1,0 +1,566 @@
+﻿@using BlazorTemplate.Models
+@using BlazorTemplate.Interfaces
+@using Microsoft.FluentUI.AspNetCore.Components
+@using BlazorTemplate.Services
+@inject IBatchService _batchService
+
+@if (IsOpen)
+{
+    <FluentDialog Open="@IsOpen" Width="500px">
+        <FluentDialogHeader>
+            <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
+                <FluentIcon Value="@(new Icons.Regular.Size24.Beaker())" Color="Color.Accent" />
+                <h3>Asignar Lote</h3>
+            </FluentStack>
+        </FluentDialogHeader>
+        <FluentDialogBody>
+            @if (IsLoading)
+            {
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
+                    <FluentProgressRing />
+                    <span>Cargando lotes disponibles...</span>
+                </FluentStack>
+            }
+            else
+            {
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="12">
+                    <FluentGrid Columns="2" ColumnGap="16" RowGap="12">
+                        <FluentGridItem>
+                            <FluentLabel>Orden:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span>@OrderId</span>
+                        </FluentGridItem>
+
+                        <FluentGridItem>
+                            <FluentLabel>Línea:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span>@(LineNumber + 1)</span>
+                        </FluentGridItem>
+
+                        <FluentGridItem>
+                            <FluentLabel>Artículo:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span>@ItemCode</span>
+                        </FluentGridItem>
+
+                        <FluentGridItem>
+                            <FluentLabel>Cantidad Total:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span>@Quantity</span>
+                        </FluentGridItem>
+
+                        <FluentGridItem>
+                            <FluentLabel>Cantidad Asignada:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span>@AssignedQuantity</span>
+                        </FluentGridItem>
+
+                        <FluentGridItem>
+                            <FluentLabel>Cantidad Pendiente:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span class="@(PendingQuantity > 0 ? "pending-quantity" : "complete-quantity")">@PendingQuantity</span>
+                        </FluentGridItem>
+                    </FluentGrid>
+
+                    <FluentDivider Style="margin: 12px 0;" />
+
+                    @if (PendingQuantity > 0)
+                    {
+                        <FluentLabel For="batchSelect" Style="font-weight: 600;">Seleccione un lote:</FluentLabel>
+
+                        @if (AvailableBatches?.Any() == true)
+                        {
+                            <div>
+                                <select id="batchSelect" class="form-select" @bind="SelectedBatchId">
+                                    <option value="">Seleccione un lote</option>
+                                    @foreach (var batch in AvailableBatches)
+                                    {
+                                        <option value="@batch.BatchId">@batch.DisplayInfo (Disponible: @batch.AvailableQuantity)</option>
+                                    }
+                                </select>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(SelectedBatchId))
+                            {
+                                <div style="margin-top: 12px;">
+                                    <FluentLabel For="quantityInput" Style="font-weight: 600;">Cantidad a asignar:</FluentLabel>
+                                    <input id="quantityInput" type="number" class="form-control"
+                                           min="1"
+                                           max="@Math.Min(GetSelectedBatchAvailableQuantity(), PendingQuantity)"
+                                           @bind="QuantityToAssign" />
+
+                                    <div style="margin-top: 4px; font-size: 0.8em; color: #666;">
+                                        Máximo disponible en este lote: @GetSelectedBatchAvailableQuantity()
+                                    </div>
+                                </div>
+                            }
+
+                            @if (!string.IsNullOrEmpty(ErrorMessage))
+                            {
+                                <div class="error-message">@ErrorMessage</div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="warning-message">No hay lotes disponibles para este artículo.</div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="complete-message">Se ha asignado toda la cantidad requerida.</div>
+                    }
+
+                    <!-- Tabla de asignaciones realizadas -->
+                    @if (BatchAssignments.Any())
+                    {
+                        <FluentDivider Style="margin: 12px 0;" />
+                        <h4>Asignaciones realizadas:</h4>
+                        <table class="batch-assignments-table">
+                            <thead>
+                                <tr>
+                                    <th>Lote</th>
+                                    <th>Cantidad</th>
+                                    <th>Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var assignment in BatchAssignments)
+                                {
+                                    <tr>
+                                        <td>@assignment.BatchId</td>
+                                        <td>@assignment.Quantity</td>
+                                        <td>
+                                            <button @onclick="() => RemoveAssignment(assignment)" class="remove-button">
+                                                <FluentIcon Value="@(new Icons.Regular.Size16.Delete())" Color="Color.Error" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </FluentStack>
+            }
+        </FluentDialogBody>
+        <FluentDialogFooter>
+            <FluentButton Appearance="Appearance.Neutral" OnClick="@HandleCancel">Cancelar</FluentButton>
+
+            @if (PendingQuantity > 0 && !string.IsNullOrEmpty(SelectedBatchId) && QuantityToAssign > 0)
+            {
+                <FluentButton Appearance="Appearance.Accent"
+                              Style="background-color: #28a745;"
+                              OnClick="@AddBatchAssignment">
+                    Añadir Asignación
+                </FluentButton>
+            }
+
+            <!-- Botón para confirmar - ahora siempre habilitado -->
+            <FluentButton Appearance="Appearance.Accent"
+                          Style="background-color: #007bff;"
+                          OnClick="@ConfirmAssignments">
+                Confirmar Asignaciones
+            </FluentButton>
+        </FluentDialogFooter>
+    </FluentDialog>
+}
+
+<style>
+    .error-message {
+        color: red;
+        margin-top: 8px;
+        font-size: 14px;
+    }
+
+    .warning-message {
+        color: #FF8C00;
+        margin-top: 8px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .complete-message {
+        color: #28a745;
+        margin-top: 8px;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .pending-quantity {
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    .complete-quantity {
+        color: #28a745;
+        font-weight: bold;
+    }
+
+    .form-select, .form-control {
+        display: block;
+        width: 100%;
+        padding: 0.375rem 0.75rem;
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212529;
+        background-color: #fff;
+        background-clip: padding-box;
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+
+        .form-select:focus, .form-control:focus {
+            border-color: #86b7fe;
+            outline: 0;
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        }
+
+    .batch-assignments-table {
+        width: 100%;
+        margin-top: 12px;
+        border-collapse: collapse;
+    }
+
+        .batch-assignments-table th, .batch-assignments-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .batch-assignments-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+
+    .remove-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 2px;
+    }
+
+        .remove-button:hover {
+            background-color: #f8d7da;
+            border-radius: 4px;
+        }
+</style>
+
+@code {
+    private int _lastOrderId = 0;
+    private int _lastLineNumber = -1;
+
+    [Parameter] public bool IsOpen { get; set; } = false;
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public int OrderId { get; set; }
+    [Parameter] public int LineNumber { get; set; }
+    [Parameter] public string ItemCode { get; set; }
+    [Parameter] public int Quantity { get; set; }
+    [Parameter] public EventCallback<bool> OnBatchAssigned { get; set; }
+
+    private List<Batch> AvailableBatches { get; set; } = new List<Batch>();
+    private string SelectedBatchId { get; set; }
+    private int QuantityToAssign { get; set; } = 0;
+    private bool IsLoading { get; set; } = false;
+    private string ErrorMessage { get; set; }
+
+    // Lista de asignaciones de batch
+    private List<BatchAssignment> BatchAssignments { get; set; } = new List<BatchAssignment>();
+
+    // Cantidad total asignada
+    private int AssignedQuantity => BatchAssignments.Sum(a => a.Quantity);
+
+    // Cantidad pendiente por asignar
+    private int PendingQuantity => Quantity - AssignedQuantity;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Si el diálogo se acaba de abrir o si cambió la orden/línea, resetear las asignaciones
+        if (IsOpen && (_lastOrderId != OrderId || _lastLineNumber != LineNumber))
+        {
+            _lastOrderId = OrderId;
+            _lastLineNumber = LineNumber;
+
+            // Limpiar las asignaciones al cambiar de línea
+            BatchAssignments.Clear();
+
+            // Cargar asignaciones existentes para esta línea específica
+            if (!string.IsNullOrEmpty(ItemCode))
+            {
+                await LoadExistingAssignments();
+                await LoadAvailableBatches();
+            }
+        }
+        else if (IsOpen && !string.IsNullOrEmpty(ItemCode) && BatchAssignments.Count == 0)
+        {
+            // En caso de que se abra el diálogo sin cambiar la línea pero no haya asignaciones
+            await LoadExistingAssignments();
+            await LoadAvailableBatches();
+        }
+    }
+
+    private async Task LoadExistingAssignments()
+    {
+        // Cargar asignaciones existentes si las hay
+        var existingBatchAssignments = await _batchService.GetBatchAssignmentsForOrderLineAsync(OrderId, LineNumber);
+        if (existingBatchAssignments.Any())
+        {
+            BatchAssignments = existingBatchAssignments;
+        }
+        else
+        {
+            BatchAssignments.Clear();
+        }
+    }
+
+    private async Task LoadAvailableBatches()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = string.Empty;
+            StateHasChanged();
+
+            // Obtener lotes disponibles para este artículo
+            AvailableBatches = await _batchService.GetAvailableBatchesForItemAsync(ItemCode);
+
+            // Si hay asignaciones, ajustar la cantidad disponible en los lotes
+            if (BatchAssignments.Any())
+            {
+                foreach (var assignment in BatchAssignments)
+                {
+                    var batch = AvailableBatches.FirstOrDefault(b => b.BatchId == assignment.BatchId);
+                    if (batch != null)
+                    {
+                        // Excluir este lote de los disponibles si ya está completamente asignado
+                        if (batch.AvailableQuantity <= assignment.Quantity)
+                        {
+                            AvailableBatches.Remove(batch);
+                        }
+                        else
+                        {
+                            // Ajustar la cantidad disponible
+                            batch.AvailableQuantity -= assignment.Quantity;
+                        }
+                    }
+                }
+            }
+
+            // Ordenar los lotes por fecha de vencimiento (FEFO)
+            AvailableBatches = AvailableBatches.OrderBy(b => b.EndDate).ToList();
+
+            // Seleccionar el primer lote disponible por defecto
+            if (AvailableBatches.Any() && PendingQuantity > 0)
+            {
+                SelectedBatchId = AvailableBatches.First().BatchId;
+                // Inicializar la cantidad a asignar al mínimo entre la cantidad pendiente y la disponible en el lote
+                QuantityToAssign = Math.Min(PendingQuantity, GetSelectedBatchAvailableQuantity());
+            }
+            else
+            {
+                SelectedBatchId = string.Empty;
+                QuantityToAssign = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error al cargar lotes: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private int GetSelectedBatchAvailableQuantity()
+    {
+        if (string.IsNullOrEmpty(SelectedBatchId))
+            return 0;
+
+        var batch = AvailableBatches.FirstOrDefault(b => b.BatchId == SelectedBatchId);
+        return batch?.AvailableQuantity ?? 0;
+    }
+
+    private void AddBatchAssignment()
+    {
+        if (string.IsNullOrEmpty(SelectedBatchId) || QuantityToAssign <= 0)
+        {
+            ErrorMessage = "Debe seleccionar un lote y una cantidad válida";
+            return;
+        }
+
+        // Verificar que no exceda la cantidad disponible en el lote
+        int availableQuantity = GetSelectedBatchAvailableQuantity();
+        if (QuantityToAssign > availableQuantity)
+        {
+            ErrorMessage = $"La cantidad excede la disponible en el lote ({availableQuantity})";
+            return;
+        }
+
+        // Verificar que no exceda la cantidad pendiente
+        if (QuantityToAssign > PendingQuantity)
+        {
+            ErrorMessage = $"La cantidad excede la pendiente por asignar ({PendingQuantity})";
+            return;
+        }
+
+        // Buscar si ya existe una asignación para este lote
+        var existingAssignment = BatchAssignments.FirstOrDefault(a => a.BatchId == SelectedBatchId);
+        if (existingAssignment != null)
+        {
+            // Actualizar la cantidad
+            existingAssignment.Quantity += QuantityToAssign;
+        }
+        else
+        {
+            // Crear una nueva asignación
+            BatchAssignments.Add(new BatchAssignment
+                {
+                    BatchId = SelectedBatchId,
+                    Quantity = QuantityToAssign
+                });
+        }
+
+        // Actualizar la cantidad disponible en el lote seleccionado
+        var selectedBatch = AvailableBatches.FirstOrDefault(b => b.BatchId == SelectedBatchId);
+        if (selectedBatch != null)
+        {
+            selectedBatch.AvailableQuantity -= QuantityToAssign;
+
+            // Si ya no hay cantidad disponible, quitar el lote de la lista
+            if (selectedBatch.AvailableQuantity <= 0)
+            {
+                AvailableBatches.Remove(selectedBatch);
+            }
+        }
+
+        // Resetear la selección si aún queda cantidad pendiente
+        if (PendingQuantity - QuantityToAssign > 0 && AvailableBatches.Any())
+        {
+            SelectedBatchId = AvailableBatches.First().BatchId;
+            QuantityToAssign = Math.Min(PendingQuantity - QuantityToAssign, GetSelectedBatchAvailableQuantity());
+        }
+        else
+        {
+            SelectedBatchId = string.Empty;
+            QuantityToAssign = 0;
+        }
+
+        ErrorMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    private void RemoveAssignment(BatchAssignment assignment)
+    {
+        // Eliminar la asignación
+        BatchAssignments.Remove(assignment);
+
+        // Restaurar la cantidad disponible en el lote
+        var batch = AvailableBatches.FirstOrDefault(b => b.BatchId == assignment.BatchId);
+        if (batch != null)
+        {
+            batch.AvailableQuantity += assignment.Quantity;
+        }
+        else
+        {
+            // Si el lote ya no está en la lista, volver a agregarlo
+            var allBatches = _batchService.GetAvailableBatchesAsync().GetAwaiter().GetResult();
+            var originalBatch = allBatches.FirstOrDefault(b => b.BatchId == assignment.BatchId && b.ItemCode == ItemCode);
+            if (originalBatch != null)
+            {
+                var newBatch = new Batch
+                    {
+                        BatchId = originalBatch.BatchId,
+                        StartDate = originalBatch.StartDate,
+                        EndDate = originalBatch.EndDate,
+                        ItemCode = originalBatch.ItemCode,
+                        AvailableQuantity = assignment.Quantity
+                    };
+                AvailableBatches.Add(newBatch);
+                // Ordenar los lotes por fecha de vencimiento (FEFO)
+                AvailableBatches = AvailableBatches.OrderBy(b => b.EndDate).ToList();
+            }
+        }
+
+        // Resetear la selección si hay lotes disponibles
+        if (AvailableBatches.Any())
+        {
+            SelectedBatchId = AvailableBatches.First().BatchId;
+            QuantityToAssign = Math.Min(PendingQuantity, GetSelectedBatchAvailableQuantity());
+        }
+        else
+        {
+            SelectedBatchId = string.Empty;
+            QuantityToAssign = 0;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task ConfirmAssignments()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = string.Empty;
+            StateHasChanged();
+
+            // Guardar las asignaciones (incluso si están vacías)
+            bool success = await _batchService.SaveBatchAssignmentsForOrderLineAsync(OrderId, LineNumber, BatchAssignments);
+
+            if (success)
+            {
+                // Cerrar el diálogo y notificar éxito
+                await CloseDialog();
+                await OnBatchAssigned.InvokeAsync(true);
+            }
+            else
+            {
+                ErrorMessage = "No se pudo guardar las asignaciones de lotes";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error al guardar asignaciones: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleCancel()
+    {
+        await CloseDialog();
+    }
+
+    private async Task CloseDialog()
+    {
+        // Resetear la línea actual al cerrar
+        _lastOrderId = 0;
+        _lastLineNumber = -1;
+        BatchAssignments.Clear();
+
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    // Clase para representar una asignación de batch
+    public class BatchAssignment
+    {
+        public string BatchId { get; set; }
+        public int Quantity { get; set; }
+    }
+}

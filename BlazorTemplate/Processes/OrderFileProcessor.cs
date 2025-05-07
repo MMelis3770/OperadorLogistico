@@ -1,98 +1,157 @@
 ﻿using BlazorTemplate.Models;
 
-namespace BlazorTemplate.Processes
+public class OrderFileProcessor
 {
-    public class OrderFileProcessor
+    private readonly string _directoryPath;
+
+    public OrderFileProcessor(string directoryPath)
     {
-        private readonly string _directoryPath;
+        _directoryPath = directoryPath;
+    }
 
-        public OrderFileProcessor(string directoryPath)
+    // Process all txt files in the directory
+    public List<OrderData> ProcessFiles()
+    {
+        List<OrderData> orders = new List<OrderData>();
+        try
         {
-            _directoryPath = directoryPath;
-        }
-
-        // Process all txt files in the directory
-        public List<OrderData> ProcessFiles()
-        {
-            List<OrderData> orders = new List<OrderData>();
-
-            try
+            // Asegurarse de que el directorio existe
+            if (!Directory.Exists(_directoryPath))
             {
-                string[] files = Directory.GetFiles(_directoryPath, "*.txt");
+                Console.WriteLine($"El directorio {_directoryPath} no existe.");
+                return orders;
+            }
 
-                foreach (string file in files)
+            string[] files = Directory.GetFiles(_directoryPath, "*.txt");
+            Console.WriteLine($"Encontrados {files.Length} archivos .txt para procesar");
+
+            foreach (string file in files)
+            {
+                Console.WriteLine($"Procesando archivo: {file}");
+                var fileOrders = ProcessFile(file);
+                Console.WriteLine($"Órdenes extraídas del archivo: {fileOrders.Count}");
+
+                if (fileOrders.Any())
                 {
-                    var fileOrders = ProcessFile(file);
-                    if (fileOrders.Any())
-                    {
-                        orders.AddRange(fileOrders);
-                    }
+                    orders.AddRange(fileOrders);
                 }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error processing files: {ex.Message}");
-            }
-
-            return orders;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error processing files: {ex.Message}");
         }
 
-        // Process txt files
-        private List<OrderData> ProcessFile(string filePath)
+        Console.WriteLine($"Total de órdenes procesadas: {orders.Count}");
+        return orders;
+    }
+
+    // Process txt files
+    private List<OrderData> ProcessFile(string filePath)
+    {
+        List<OrderData> orders = new List<OrderData>();
+        OrderData currentOrder = null;
+
+        try
         {
-            List<OrderData> orders = new List<OrderData>();
-            OrderData currentOrder = null;
+            string[] lines = File.ReadAllLines(filePath);
+            Console.WriteLine($"Líneas leídas del archivo: {lines.Length}");
 
-            try
+            foreach (string line in lines)
             {
-                string[] lines = File.ReadAllLines(filePath);
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
 
-                foreach (string line in lines)
+                string[] parts = line.Split('|');
+
+                if (parts.Length < 2)
                 {
-                    string[] parts = line.Split('|');
+                    Console.WriteLine($"Línea ignorada (formato incorrecto): {line}");
+                    continue;
+                }
 
-                    if (parts[0] == "HEADER")
+                if (parts[0] == "HEADER")
+                {
+                    // Añadir la orden anterior si existe
+                    if (currentOrder != null)
                     {
-                        if (currentOrder != null)
+                        orders.Add(currentOrder);
+                    }
+
+                    if (parts.Length >= 5)
+                    {
+                        try
                         {
-                            orders.Add(currentOrder);
+                            currentOrder = new OrderData
+                            {
+                                ID = int.Parse(parts[1].Trim()),
+                                Client = parts[2].Trim(),
+                                OrderDate = DateTime.Parse(parts[3].Trim()),
+                                DueDate = DateTime.Parse(parts[4].Trim())
+                            };
+
+                            Console.WriteLine($"Nueva orden: ID={currentOrder.ID}, Cliente={currentOrder.Client}");
                         }
-
-                        currentOrder = new OrderData
+                        catch (Exception ex)
                         {
-                            ID = int.Parse(parts[1]),
-                            Client = parts[2],
-                            OrderDate = DateTime.Parse(parts[3]),
-                            DueDate = DateTime.Parse(parts[4])
-                        };
+                            Console.WriteLine($"Error al parsear la cabecera: {ex.Message}");
+                            currentOrder = null;
+                        }
                     }
-                    else if (parts[0] == "LINE" && currentOrder != null)
+                    else
                     {
-                        var lineItem = new LineItem
-                        {
-                            OrderID = int.Parse(parts[1]),
-                            LineNumber = int.Parse(parts[2]),
-                            ItemCode = parts[3],
-                            Quantity = int.Parse(parts[4]),
-                        };
-
-                        currentOrder.LineItems.Add(lineItem);
+                        Console.WriteLine($"HEADER incompleto: {line}");
+                        currentOrder = null;
                     }
                 }
-
-                // Add the last order if there is one
-                if (currentOrder != null)
+                else if (parts[0] == "LINE" && currentOrder != null)
                 {
-                    orders.Add(currentOrder);
+                    if (parts.Length >= 5)
+                    {
+                        try
+                        {
+                            var lineItem = new LineItem
+                            {
+                                OrderID = int.Parse(parts[1].Trim()),
+                                LineNumber = int.Parse(parts[2].Trim()),
+                                ItemCode = parts[3].Trim(),
+                                Quantity = int.Parse(parts[4].Trim()),
+                            };
+
+                            // Verificar que la línea corresponde a la orden actual
+                            if (lineItem.OrderID == currentOrder.ID)
+                            {
+                                currentOrder.LineItems.Add(lineItem);
+                                Console.WriteLine($"Línea añadida: Orden={lineItem.OrderID}, Línea={lineItem.LineNumber}, Item={lineItem.ItemCode}");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"ID de orden incorrecto en la línea: {line}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error al parsear la línea: {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"LINE incompleta: {line}");
+                    }
                 }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error processing file {filePath}: {ex.Message}");
-            }
 
-            return orders;
+            // Añadir la última orden si existe
+            if (currentOrder != null)
+            {
+                orders.Add(currentOrder);
+            }
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error processing file {filePath}: {ex.Message}");
+        }
+
+        return orders;
     }
 }
-

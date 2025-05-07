@@ -12,5 +12,6 @@ namespace BlazorTemplate.Models
         public int LineNumber { get; set; }
         public string ItemCode { get; set; }
         public int Quantity { get; set; }
+        public string Batch { get; set; }
     }
 }

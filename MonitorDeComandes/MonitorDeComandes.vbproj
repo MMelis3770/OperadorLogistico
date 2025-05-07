@@ -163,6 +163,10 @@
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Classes\Entities\BatchNumbers.vb" />
+    <Compile Include="Classes\Entities\Delivery.vb" />
+    <Compile Include="Classes\Entities\DeliveryLines.vb" />
+    <Compile Include="Classes\Entities\DeliveryResponse.vb" />
     <Compile Include="Classes\Entities\Order.vb" />
     <Compile Include="Classes\Entities\OrderLines.vb" />
     <Compile Include="Classes\Entities\SERVICELAYER\BatchNumbers.vb" />
@@ -181,6 +185,7 @@
     <Compile Include="Classes\Initialize\SEI_SQL.vb" />
     <Compile Include="Classes\Useful\DataTableExtension.vb" />
     <Compile Include="Crystal Report\SEI_CrystalReport.vb" />
+    <Compile Include="Forms Add-on\SEI_ConfOrders.vb" />
     <Compile Include="Forms Add-on\SEI_OrdersMonitor.vb" />
     <Compile Include="Forms Add-on\SEI_AddonSettings.vb" />
     <Compile Include="Forms SAP\SEI_AlbaranCompras.vb" />
@@ -272,6 +277,7 @@
     <EmbeddedResource Include="Images\sap48Rojo.ico" />
     <EmbeddedResource Include="Forms .srf\SEI_OrdersMonitor.srf" />
     <EmbeddedResource Include="Forms .srf\SEI_ConfOrders.srf" />
+    <Content Include="Images\Integration logistic.bmp" />
     <Content Include="Libraries\DatabaseConnection.dll" />
     <Content Include="Libraries\Newtonsoft.Json.dll" />
     <Content Include="Libraries\SEIDOR-SLayer.dll" />
