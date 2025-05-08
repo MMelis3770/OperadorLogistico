@@ -1,5 +1,6 @@
 using BlazorTemplate.Interfaces;
 using BlazorTemplate.Services;
+using BlazorTemplate.Processes;
 using BlazorTemplateService;
 using DatabaseConnection;
 using Microsoft.Extensions.Configuration;
@@ -55,6 +56,7 @@ internal static class Program
                         context.Configuration.GetSection("SqlConnection").GetValue<string>("Password")
                     );
                 });
+                services.AddSingleton<SQLManagement>();
             })
             .ConfigureLogging((context, logging) =>
             {

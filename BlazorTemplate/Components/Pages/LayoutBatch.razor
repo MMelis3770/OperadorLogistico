@@ -181,10 +181,10 @@
 
                 // Convertir a formato para la grid
                 var orderList = processedOrders.Select(o => new Order(
-                    o.ID,
-                    o.Client,
+                    o.DocEntry,
+                    o.CardCode,
                     DateOnly.FromDateTime(o.OrderDate),
-                    DateOnly.FromDateTime(o.DueDate),
+                    DateOnly.FromDateTime(o.DocDueDate),
                     o.LineItems.Count
                 )).ToList();
 
@@ -219,14 +219,14 @@
         StateHasChanged(); // Forzar actualización para mostrar el encabezado de la sección de detalles
 
         // Busca en las órdenes procesadas
-        var orderData = processedOrders.FirstOrDefault(o => o.ID == selectedOrder.ID);
+        var orderData = processedOrders.FirstOrDefault(o => o.DocEntry == selectedOrder.ID);
 
         if (orderData != null && orderData.LineItems.Any())
         {
             // Convertir las líneas al formato para la grid
             var lineItems = orderData.LineItems
                 .Select(li => new OrderLineItem(
-                    li.LineNumber,
+                    li.LineNum,
                     li.ItemCode,
                     li.Quantity,
                     li.Batch
@@ -255,14 +255,14 @@
         }
 
         // Eliminar de processedOrders
-        processedOrders.RemoveAll(o => o.ID == order.ID);
+        processedOrders.RemoveAll(o => o.DocEntry == order.ID);
 
         // Actualizar la vista
         var orderList = processedOrders.Select(o => new Order(
-            o.ID,
-            o.Client,
+            o.DocEntry,
+            o.CardCode,
             DateOnly.FromDateTime(o.OrderDate),
-            DateOnly.FromDateTime(o.DueDate),
+            DateOnly.FromDateTime(o.DocDueDate),
             o.LineItems.Count
         )).ToList();
 
@@ -298,10 +298,10 @@
             List<int> ordersWithMissingBatches = new List<int>();
             foreach (var order in processedOrders)
             {
-                bool allAssigned = await _batchService.AllOrderLinesHaveBatchesAsync(order.ID);
+                bool allAssigned = await _batchService.AllOrderLinesHaveBatchesAsync(order.DocEntry);
                 if (!allAssigned)
                 {
-                    ordersWithMissingBatches.Add(order.ID);
+                    ordersWithMissingBatches.Add(order.DocEntry);
                 }
             }
 
@@ -345,7 +345,7 @@
 
             foreach (var order in processedOrders)
             {
-                summary.AppendLine($"- Orden {order.ID}: {order.Client}, {order.LineItems.Count} líneas");
+                summary.AppendLine($"- Orden {order.DocEntry}: {order.CardCode}, {order.LineItems.Count} líneas");
             }
 
             // Confirmación antes de procesar
@@ -369,10 +369,10 @@
                 await Task.Delay(500); // Simulación de procesamiento por orden
 
                 // Opcional: confirmar cada orden en SAP
-                bool sapResult = await _orderService.ConfirmOrderToSAP(order.ID);
+                bool sapResult = await _orderService.ConfirmOrderToSAP(order.DocEntry);
                 if (!sapResult)
                 {
-                    await _dialogService.ShowWarningAsync($"Advertencia: La orden {order.ID} no se pudo confirmar en SAP.", "Advertencia");
+                    await _dialogService.ShowWarningAsync($"Advertencia: La orden {order.DocEntry} no se pudo confirmar en SAP.", "Advertencia");
                 }
             }
 
@@ -418,13 +418,13 @@
             // Crear un objeto anónimo que represente las órdenes en el formato deseado para la API
             var apiOrders = orders.Select(o => new
             {
-                id = o.ID,
-                client = o.Client,
+                id = o.DocEntry,
+                client = o.CardCode,
                 orderDate = o.OrderDate.ToString("yyyy-MM-dd"),
-                dueDate = o.DueDate.ToString("yyyy-MM-dd"),
+                dueDate = o.DocDueDate.ToString("yyyy-MM-dd"),
                 lines = o.LineItems.Select(li => new
                 {
-                    lineNumber = li.LineNumber + 1,
+                    lineNumber = li.LineNum + 1,
                     itemCode = li.ItemCode,
                     quantity = li.Quantity,
                     batch = li.Batch
@@ -498,13 +498,13 @@
             if (selectedOrder != null)
             {
                 // Recargar los detalles de la orden seleccionada
-                var orderData = processedOrders.FirstOrDefault(o => o.ID == selectedOrder.ID);
+                var orderData = processedOrders.FirstOrDefault(o => o.DocEntry == selectedOrder.ID);
                 if (orderData != null && orderData.LineItems.Any())
                 {
                     // Convertir las líneas al formato para la grid
                     var lineItems = orderData.LineItems
                         .Select(li => new OrderLineItem(
-                            li.LineNumber,
+                            li.LineNum,
                             li.ItemCode,
                             li.Quantity,
                             li.Batch

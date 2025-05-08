@@ -4,12 +4,14 @@
 @using System.IO
 @using BlazorTemplate.Models
 @using BlazorTemplate.Interfaces
+@using BlazorTemplate.Processes
 @using Microsoft.FluentUI.AspNetCore.Components
 @using BlazorTemplate.Services
 @inject IDialogService _dialogService
 @inject IOrderService _orderService
 @inject ISelectedOrdersService _selectedOrdersService
 @inject NavigationManager _navigationManager
+@inject SQLManagement sqlManagement
 @page "/TestTemplate"
 @implements IDisposable
 
@@ -21,7 +23,7 @@
     <FluentSpacer />
 
     <FluentButton Appearance="Appearance.Accent" Style="margin-right: 40px" BackgroundColor="#28a745"
-                  OnClick="@(async () => await NavigateToBatchWithSelected())">
+    OnClick="@(async () => await NavigateToBatchWithSelected())">
         Subir Comandas
     </FluentButton>
 
@@ -46,7 +48,7 @@
             <TemplateColumn Title="">
                 <ChildContent>
                     <button @onclick="@(() => HandleRowClick(context))"
-                            style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; display: flex; justify-content: center; align-items: center;">
+                    style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; display: flex; justify-content: center; align-items: center;">
                         <FluentIcon Value="@(new Icons.Regular.Size20.Eye())" Color="Color.Accent" />
                     </button>
                 </ChildContent>
@@ -159,16 +161,73 @@
 
         // Obtener las órdenes completas usando los IDs
         var selectedOrdersData = processedOrders
-            .Where(o => selectedOrderIds.Contains(o.ID))
+            .Where(o => selectedOrderIds.Contains(o.DocEntry))
             .ToList();
 
         // Guardar en el servicio compartido
         _selectedOrdersService.SetSelectedOrders(selectedOrdersData);
 
+        ValidateOrdersBeforeSQL(selectedOrdersData);
+
         // Navegar a la página de Batch
         _navigationManager.NavigateTo("/LayoutBatch");
     }
 
+    private async void ValidateOrdersBeforeSQL(List<OrderData> selectedOrdersData)
+    {
+        var ordersToSQL = selectedOrdersData;
+        foreach (var order in ordersToSQL)
+        {
+            var cardCode = order.CardCode;
+            var orderDate = order.OrderDate;
+            var docDueDate = order.DocDueDate;
+
+            // Validar que la fecha sea valida (fecha current entre OrderDate y DocDueDate)
+            if (!ValidateOrderDate(orderDate, docDueDate))
+            {
+                throw new Exception($"Order {order.DocEntry} is not valid for the current date. " +
+                                              $"Current date must be between {orderDate:yyyy-MM-dd} and {docDueDate:yyyy-MM-dd}");
+            }
+
+            // Validar si el cliente existe en la BBDD
+            if (!sqlManagement.ValidateActiveClients(cardCode))
+            {
+                throw new Exception($"Client {cardCode} does not exist in the database");
+            }
+
+            foreach (var line in order.LineItems)
+            {
+                // Validar si el item existe en la BBDD
+                if (!sqlManagement.GetItems(line.ItemCode))
+                {
+                    throw new Exception($"Item {line.ItemCode} does not exist in the database");
+                }
+
+                // Validar si hay batches suficientes para los items
+                if (!sqlManagement.GetBatches(line.ItemCode))
+                {
+                    throw new Exception($"Item {line.ItemCode} does not have any available batch");
+
+                }
+            }
+        }
+        sqlManagement.LoadOrdersToSQL(ordersToSQL);
+
+    }
+
+
+    public bool ValidateOrderDate(DateTime orderDate, DateTime docDueDate)
+    {
+        try
+        {
+            var currentDate = DateTime.Now;
+            return currentDate >= orderDate && currentDate <= docDueDate;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Error validating order dates: {ex.Message}", ex);
+        }
+    }
     private async Task LoadOrdersFromFiles()
     {
         if (isLoading) return;
@@ -183,10 +242,10 @@
 
             // Convertir a formato para la grid
             var orderList = processedOrders.Select(o => new Order(
-                o.ID,
-                o.Client,
+                o.DocEntry,
+                o.CardCode,
                 DateOnly.FromDateTime(o.OrderDate),
-                DateOnly.FromDateTime(o.DueDate),
+                DateOnly.FromDateTime(o.DocDueDate),
                 o.LineItems.Count  // Mostrar número de líneas
             )).ToList();
 
@@ -232,14 +291,14 @@
         StateHasChanged(); // Forzar actualización para mostrar el encabezado de la sección de detalles
 
         // Busca en las órdenes procesadas
-        var orderData = processedOrders.FirstOrDefault(o => o.ID == selectedOrder.ID);
+        var orderData = processedOrders.FirstOrDefault(o => o.DocEntry == selectedOrder.ID);
 
         if (orderData != null && orderData.LineItems.Any())
         {
             // Convertir las líneas al formato para la grid
             var lineItems = orderData.LineItems
                 .Select(li => new OrderLineItem(
-                    li.LineNumber,
+                    li.LineNum,
                     li.ItemCode,
                     li.Quantity
                 ))

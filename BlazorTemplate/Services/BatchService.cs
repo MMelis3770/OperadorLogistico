@@ -93,13 +93,13 @@ namespace BlazorTemplate.Services
 
             // Verificar que la orden y línea existen
             var orders = _selectedOrdersService.SelectedOrders;
-            var order = orders.FirstOrDefault(o => o.ID == orderId);
+            var order = orders.FirstOrDefault(o => o.DocEntry == orderId);
             if (order == null)
             {
                 return false;
             }
 
-            var line = order.LineItems.FirstOrDefault(l => l.LineNumber == lineNumber);
+            var line = order.LineItems.FirstOrDefault(l => l.LineNum == lineNumber);
             if (line == null)
             {
                 return false;
@@ -145,10 +145,10 @@ namespace BlazorTemplate.Services
 
             // Si no está en nuestro diccionario, verificar en la orden directamente
             var orders = _selectedOrdersService.SelectedOrders;
-            var order = orders.FirstOrDefault(o => o.ID == orderId);
+            var order = orders.FirstOrDefault(o => o.DocEntry == orderId);
             if (order != null)
             {
-                var line = order.LineItems.FirstOrDefault(l => l.LineNumber == lineNumber);
+                var line = order.LineItems.FirstOrDefault(l => l.LineNum == lineNumber);
                 if (line != null && !string.IsNullOrEmpty(line.Batch))
                 {
                     // Crear una asignación por defecto para toda la cantidad
@@ -183,10 +183,10 @@ namespace BlazorTemplate.Services
 
             // Si no está en nuestro diccionario, verificar en la orden directamente
             var orders = _selectedOrdersService.SelectedOrders;
-            var order = orders.FirstOrDefault(o => o.ID == orderId);
+            var order = orders.FirstOrDefault(o => o.DocEntry == orderId);
             if (order != null)
             {
-                var line = order.LineItems.FirstOrDefault(l => l.LineNumber == lineNumber);
+                var line = order.LineItems.FirstOrDefault(l => l.LineNum == lineNumber);
                 if (line != null && !string.IsNullOrEmpty(line.Batch))
                 {
                     // Crear una asignación por defecto para toda la cantidad
@@ -213,13 +213,13 @@ namespace BlazorTemplate.Services
 
             // Verificar que la orden y línea existen
             var orders = _selectedOrdersService.SelectedOrders;
-            var order = orders.FirstOrDefault(o => o.ID == orderId);
+            var order = orders.FirstOrDefault(o => o.DocEntry == orderId);
             if (order == null)
             {
                 return false;
             }
 
-            var line = order.LineItems.FirstOrDefault(l => l.LineNumber == lineNumber);
+            var line = order.LineItems.FirstOrDefault(l => l.LineNum == lineNumber);
             if (line == null)
             {
                 return false;
@@ -301,7 +301,7 @@ namespace BlazorTemplate.Services
         {
 
             var orders = _selectedOrdersService.SelectedOrders;
-            var order = orders.FirstOrDefault(o => o.ID == orderId);
+            var order = orders.FirstOrDefault(o => o.DocEntry == orderId);
             if (order == null)
             {
                 return true; // No hay orden, no hay problema
@@ -310,7 +310,7 @@ namespace BlazorTemplate.Services
             // Verificar cada línea
             foreach (var line in order.LineItems)
             {
-                var assignments = await GetBatchAssignmentsForOrderLineAsync(orderId, line.LineNumber);
+                var assignments = await GetBatchAssignmentsForOrderLineAsync(orderId, line.LineNum);
                 int totalAssigned = assignments.Sum(a => a.Quantity);
                 if (totalAssigned != line.Quantity)
                 {
@@ -324,7 +324,7 @@ namespace BlazorTemplate.Services
         public async Task<bool> AutoAssignBatchesToOrderAsync(int orderId)
         {
             var orders = _selectedOrdersService.SelectedOrders;
-            var order = orders.FirstOrDefault(o => o.ID == orderId);
+            var order = orders.FirstOrDefault(o => o.DocEntry == orderId);
             if (order == null)
             {
                 return false;
@@ -335,7 +335,7 @@ namespace BlazorTemplate.Services
             foreach (var line in order.LineItems)
             {
                 // Verificar si ya hay asignaciones
-                var assignments = await GetBatchAssignmentsForOrderLineAsync(orderId, line.LineNumber);
+                var assignments = await GetBatchAssignmentsForOrderLineAsync(orderId, line.LineNum);
                 int totalAssigned = assignments.Sum(a => a.Quantity);
                 int pendingQuantity = line.Quantity - totalAssigned;
 
@@ -376,7 +376,7 @@ namespace BlazorTemplate.Services
                     if (remainingQuantity <= 0)
                     {
                         // Guardar las asignaciones
-                        bool success = await SaveBatchAssignmentsForOrderLineAsync(orderId, line.LineNumber, newAssignments);
+                        bool success = await SaveBatchAssignmentsForOrderLineAsync(orderId, line.LineNum, newAssignments);
                         if (!success)
                         {
                             allAssigned = false;

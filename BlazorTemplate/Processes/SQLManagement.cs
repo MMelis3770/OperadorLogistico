@@ -1,58 +1,92 @@
 ﻿using BlazorTemplate.Models;
 using DatabaseConnection;
 using Microsoft.Extensions.Configuration;
-
 namespace BlazorTemplate.Processes
 {
     public class SQLManagement
     {
         private readonly IConfiguration _configuration;
-        private static IDatabaseConnection _connection;
-        private static IEnumerable<Client> clients;
-        private static IEnumerable<OrderData> ordersDate;
-        private static IEnumerable<LineItem> items;
-
-        // Static constructor to ensure static fields are initialized
-        static SQLManagement()
-        {
-            clients = new List<Client>();
-            ordersDate = new List<OrderData>();
-            items = new List<LineItem>();
-        }
+        private readonly IDatabaseConnection _connection;
+        private IEnumerable<Client> clients;
+        private IEnumerable<OrderData> ordersDate;
+        private IEnumerable<LineItem> items;
+        private IEnumerable<Batch> batches;
 
         public SQLManagement(IConfiguration configuration, IDatabaseConnection connection)
         {
             _configuration = configuration;
-            _connection = connection; // Ensure the static connection is set
+            _connection = connection;
             clients = new List<Client>();
+            ordersDate = new List<OrderData>();
+            items = new List<LineItem>();
+            batches = new List<Batch>();
         }
 
-        public static void ValidateActiveClients()
+        public bool ValidateActiveClients(string cardCode)
         {
-            string validateClientsQuery = $"SELECT CardCode FROM dbo.Client;"; // WHERE ACTIVE = 'Y'
-            clients = _connection.Query<Client>(validateClientsQuery);
+            try
+            {
+                string validateClientsQuery = "SELECT CardCode FROM dbo.Client";
+                clients = _connection.Query<Client>(validateClientsQuery);
+
+                // Verificar si el cliente existe
+                return clients.Any(c => c.CardCode == cardCode);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error validating client {cardCode}: {ex.Message}", ex);
+            }
         }
 
-        private void ValidateOrderDate()
+        public void ValidateOrderDate(DateTime orderDate, DateTime docDueDate)
         {
-            // ---------------------------------------
-            // MODIFICAR QUERY PARA QUE FILTRE POR EL CURRENT DATE
-            // ---------------------------------------
-            string validateOrderDateQuery = $"SELECT DocEntry, CardCode, OrderDate and DocDueDate FROM dbo.Orders;";
-            ordersDate = _connection.Query<OrderData>(validateOrderDateQuery);
+
+            // PENDIENTE REVISAR PARA BATCH
+            //try
+            //{
+            //    var currentDate = DateTime.Now;
+            //    return currentDate >= orderDate && currentDate <= docDueDate;
+            //}
+            //catch (Exception ex)
+            //{
+            //    throw new Exception($"Error validating order dates: {ex.Message}", ex);
+            //}
         }
 
-        private void GetItems()
+        public bool GetItems(string itemCode)
         {
-            string validateItemCode = $"SELECT ItemCode FROM dbo.Inventory";
-            items = _connection.Query<LineItem>(validateItemCode);
+            try
+            {
+                string validateItemCode = "SELECT ItemCode FROM dbo.Inventory";
+                items = _connection.Query<LineItem>(validateItemCode);
 
-            // POSTERIOR A ESTO VERIFICAR QUE COINCIDA O PASARLO POR ARGUMENTO
+                // Verificar si el item existe
+                return items.Any(c => c.ItemCode == itemCode);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error getting items: {ex.Message}", ex);
+            }
         }
 
-        private void GetBatches()
+        public bool GetBatches(string itemCode)
         {
-            // BUSCAR LOTE POR ARGUMENTO DE ITEMCODE Y VALIDAR CON FECHA CURRENT
+            // Escapar caracteres para prevenir SQL injection
+            if (string.IsNullOrWhiteSpace(itemCode))
+                throw new ArgumentException("ItemCode cannot be null or empty");
+
+            // Escapar comillas simples
+            itemCode = itemCode.Replace("'", "''");
+
+            string batchQuery = $"SELECT * FROM dbo.Batches WHERE ItemCode = '{itemCode}'";
+            batches = _connection.Query<Batch>(batchQuery).ToList();
+
+            return batches != null && batches.Any();
+        }
+
+        public void LoadOrdersToSQL(List<OrderData> ordersToSQL)
+        {
+            string insertQuery = "INSERT INTO dbo.Comandas"
         }
     }
 }
