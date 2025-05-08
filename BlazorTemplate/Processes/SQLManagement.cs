@@ -1,30 +1,58 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using BlazorTemplate.Models;
+using DatabaseConnection;
+using Microsoft.Extensions.Configuration;
 
 namespace BlazorTemplate.Processes
 {
     public class SQLManagement
     {
-        private void GetActiveClients()
-        {
+        private readonly IConfiguration _configuration;
+        private static IDatabaseConnection _connection;
+        private static IEnumerable<Client> clients;
+        private static IEnumerable<OrderData> ordersDate;
+        private static IEnumerable<LineItem> items;
 
-        }
-        private void ValidateOrderDate() 
+        // Static constructor to ensure static fields are initialized
+        static SQLManagement()
         {
-            
-        }
-
-        private void GetItems() 
-        {
-        
+            clients = new List<Client>();
+            ordersDate = new List<OrderData>();
+            items = new List<LineItem>();
         }
 
-        private void GetBatches() 
+        public SQLManagement(IConfiguration configuration, IDatabaseConnection connection)
         {
-        
+            _configuration = configuration;
+            _connection = connection; // Ensure the static connection is set
+            clients = new List<Client>();
+        }
+
+        public static void ValidateActiveClients()
+        {
+            string validateClientsQuery = $"SELECT CardCode FROM dbo.Client;"; // WHERE ACTIVE = 'Y'
+            clients = _connection.Query<Client>(validateClientsQuery);
+        }
+
+        private void ValidateOrderDate()
+        {
+            // ---------------------------------------
+            // MODIFICAR QUERY PARA QUE FILTRE POR EL CURRENT DATE
+            // ---------------------------------------
+            string validateOrderDateQuery = $"SELECT DocEntry, CardCode, OrderDate and DocDueDate FROM dbo.Orders;";
+            ordersDate = _connection.Query<OrderData>(validateOrderDateQuery);
+        }
+
+        private void GetItems()
+        {
+            string validateItemCode = $"SELECT ItemCode FROM dbo.Inventory";
+            items = _connection.Query<LineItem>(validateItemCode);
+
+            // POSTERIOR A ESTO VERIFICAR QUE COINCIDA O PASARLO POR ARGUMENTO
+        }
+
+        private void GetBatches()
+        {
+            // BUSCAR LOTE POR ARGUMENTO DE ITEMCODE Y VALIDAR CON FECHA CURRENT
         }
     }
 }

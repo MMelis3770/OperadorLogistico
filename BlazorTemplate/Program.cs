@@ -8,15 +8,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.FluentUI.AspNetCore.Components;
 namespace BlazorTemplate;
-
-public interface ILogisticOperatorDatabaseConnection : IDatabaseConnection { }
-
-public class LogisticOperatorDatabaseConnection : SQLDatabaseConnection, ILogisticOperatorDatabaseConnection
-{
-    public LogisticOperatorDatabaseConnection(string server, string company, string user, string password)
-        : base(server, company, user, password) { }
-}
-
 internal static class Program
 {
     [STAThread]
@@ -36,7 +27,7 @@ internal static class Program
     {
         return Host.CreateDefaultBuilder()
             .ConfigureAppConfiguration((context, builder) =>
-                builder.SetBasePath(AppContext.BaseDirectory).AddJsonFile("appsettings.json", optional: false, reloadOnChange: true))
+                builder.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true))
             .ConfigureServices((context, services) =>
             {
                 services.AddWindowsFormsBlazorWebView();
@@ -52,17 +43,16 @@ internal static class Program
                 );
                 // Registrar el servicio de órdenes seleccionadas
                 services.AddSingleton<ISelectedOrdersService, SelectedOrdersService>();
-
                 // Registrar el servicio de batches
                 services.AddSingleton<IBatchService, BatchService>();
-
-                services.AddSingleton<ILogisticOperatorDatabaseConnection>(sp =>
+                services.AddSingleton<IBatchService, BatchService>();
+                services.AddSingleton<IDatabaseConnection>(sp =>
                 {
-                    return new LogisticOperatorDatabaseConnection(
-                        context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("ServiceUrl"),
-                        context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("CompanyDb"),
-                        context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("Username"),
-                        context.Configuration.GetSection("LogisticOperatorSettings").GetValue<string>("Password")
+                    return new SQLDatabaseConnection(
+                        context.Configuration.GetSection("SqlConnection").GetValue<string>("Server"),
+                        context.Configuration.GetSection("SqlConnection").GetValue<string>("Database"),
+                        context.Configuration.GetSection("SqlConnection").GetValue<string>("User"),
+                        context.Configuration.GetSection("SqlConnection").GetValue<string>("Password")
                     );
                 });
             })
