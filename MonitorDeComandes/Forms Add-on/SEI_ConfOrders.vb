@@ -292,50 +292,7 @@ Public Class SEI_ConfOrders
 #End Region
 
 #Region "FUNCIONES GENERALES"
-    Public Sub RevokeUDOPermissions()
-        Try
-            Dim company As SAPbobsCOM.Company = m_ParentAddon.SBO_Company
-            If company Is Nothing OrElse company.Connected = False Then
-                Return
-            End If
 
-            Dim authorizationService As SAPbobsCOM.IUserPermissionTree = company.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oUserPermissionTree)
-
-            Dim permissionRecordset As SAPbobsCOM.Recordset = company.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset)
-            permissionRecordset.DoQuery("SELECT INTERNAL_K, USER_CODE FROM OUSR WHERE INTERNAL_K > 0")
-
-            While Not permissionRecordset.EoF
-                Dim userId As Integer = permissionRecordset.Fields.Item("INTERNAL_K").Value
-
-                If authorizationService.GetByKey(userId) Then
-                    For i As Integer = 0 To authorizationService.Permissions.Count - 1
-                        authorizationService.Permissions.SetCurrentLine(i)
-
-                        If authorizationService.Permissions.PermissionID.Contains(UDO_ObjectName) Then
-                            authorizationService.Permissions.UserPermissions = SAPbobsCOM.BoUPTOptions.bou_FullReadNone
-
-                            Dim result As Integer = authorizationService.Update()
-                            If result <> 0 Then
-                                Dim errMsg As String = company.GetLastErrorDescription()
-                                SBO_Application.StatusBar.SetText($"Error al actualizar permisos: {errMsg}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                            End If
-
-                            Exit For
-                        End If
-                    Next
-                End If
-
-                permissionRecordset.MoveNext()
-            End While
-
-            System.Runtime.InteropServices.Marshal.ReleaseComObject(permissionRecordset)
-            System.Runtime.InteropServices.Marshal.ReleaseComObject(authorizationService)
-
-            SBO_Application.StatusBar.SetText("Permisos de UDO actualizados correctamente", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText($"Error al revocar permisos del UDO: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-        End Try
-    End Sub
 
 #End Region
 End Class
