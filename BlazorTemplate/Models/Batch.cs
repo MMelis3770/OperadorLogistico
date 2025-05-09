@@ -29,11 +29,5 @@ namespace BlazorTemplate.Models
 
         // Para mostrar en la interfaz
         public string DisplayInfo => $"{BatchId} ({StartDate:yyyy-MM-dd} a {EndDate:yyyy-MM-dd})";
-
-        // Para depuración
-        public override string ToString()
-        {
-            return $"Batch: {BatchId}, ItemCode: {ItemCode}, Disponible: {AvailableQuantity}, Activo: {IsActive}, Fechas: {StartDate:yyyy-MM-dd} - {EndDate:yyyy-MM-dd}";
-        }
     }
 }

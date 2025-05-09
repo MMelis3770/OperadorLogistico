@@ -15,6 +15,7 @@ Public Class SEI_OrdersMonitor
 #End Region
 
 #Region "CONSTANTES"
+
     Private Structure FormControls
         Const grid As String = "grid"
         Const DataTable As String = "DT_Orders"
@@ -112,9 +113,11 @@ Public Class SEI_OrdersMonitor
 #End Region
 
 #Region "FUNCIONES"
+
 #Region "INICIALIZADORES"
 
 #End Region
+
 #Region "HANDLERS"
 
     Private Sub HandleBtnFilter(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
@@ -422,15 +425,10 @@ Public Class SEI_OrdersMonitor
                         isOrderSelected = True
                         Dim delivery = CreateDeliveryObject(docEntry)
                         PostDelivery(delivery).Wait()
-                        'Do post delivery. Fer el post de totes les deliveries marcades com a chek si                   
-                        'Si ha anat be PatchStatus tal i com esta, sino cridem la funcio pero
-                        'posatn no deliverered error delivering
                         Dim response = New DeliveryResponse()
 
                         If response.IsSuccess Then
                             PatchStatus(docEntry, "Delivered").Wait()
-                        Else
-                            PatchStatus(docEntry, "Error delivering").Wait()
                         End If
 
                     ElseIf sendChecked = "Y" And operatorStatus <> "C" Then
@@ -485,7 +483,6 @@ Public Class SEI_OrdersMonitor
 
         End If
     End Sub
-
 
 #End Region
 
@@ -623,7 +620,10 @@ Public Class SEI_OrdersMonitor
                         invoice.DocumentLines.Add(invoiceLine)
                     Next
 
-                    Await m_SBOAddon.oSLConnection.Request("Invoices").PostAsync(invoice)
+                    Await m_SBOAddon.oSLConnection.Request("Invoices").PostAsync(invoice) '.GetAwaiter().GetResult() 
+                    'Marti: si el getawaiter getresult funciona i podem veure el resultat, 
+                    'a continuacio avans del patch statues podem fer un if .IsSucceded o algu així per assegurar que
+                    'només es fa el patch si ha anat bé, però avans shad e provar si funcionar a PostInvoice
 
                     Await PatchStatus(docEntry, "Invoiced")
 
@@ -900,7 +900,10 @@ Public Class SEI_OrdersMonitor
     Private Function GetOrder(docEntry As Integer) As Order
         Try
             Dim serviceLayer As SLConnection = m_SBOAddon.oSLConnection
-            Dim response = serviceLayer.Request($"Orders({docEntry})").GetAsync(Of JObject)().Result()
+            Dim response = serviceLayer.Request($"Orders({docEntry})").GetAsync(Of JObject)().Result() '.GetAwaiter().GetResult() 
+
+            'Marti: Crec que sera el getawiater.getresult ja que hem sembla que tal i com està no retorna resultat
+            'el result no surt de color groc som si no reconegues el metode, si poses getawaiter.getresult si
 
             If response Is Nothing OrElse response Is Nothing Then
                 Return Nothing

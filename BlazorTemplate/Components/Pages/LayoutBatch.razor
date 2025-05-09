@@ -181,10 +181,10 @@
 
                 // Convertir a formato para la grid
                 var orderList = processedOrders.Select(o => new Order(
-                    o.ID,
-                    o.Client,
+                    o.DocEntry,
+                    o.CardCode,
                     DateOnly.FromDateTime(o.OrderDate),
-                    DateOnly.FromDateTime(o.DueDate),
+                    DateOnly.FromDateTime(o.DocDueDate),
                     o.LineItems.Count
                 )).ToList();
 
@@ -219,14 +219,14 @@
         StateHasChanged(); // Forzar actualización para mostrar el encabezado de la sección de detalles
 
         // Busca en las órdenes procesadas
-        var orderData = processedOrders.FirstOrDefault(o => o.ID == selectedOrder.ID);
+        var orderData = processedOrders.FirstOrDefault(o => o.DocEntry == selectedOrder.ID);
 
         if (orderData != null && orderData.LineItems.Any())
         {
             // Convertir las líneas al formato para la grid
             var lineItems = orderData.LineItems
                 .Select(li => new OrderLineItem(
-                    li.LineNumber,
+                    li.LineNum,
                     li.ItemCode,
                     li.Quantity,
                     li.Batch
@@ -255,14 +255,14 @@
         }
 
         // Eliminar de processedOrders
-        processedOrders.RemoveAll(o => o.ID == order.ID);
+        processedOrders.RemoveAll(o => o.DocEntry == order.ID);
 
         // Actualizar la vista
         var orderList = processedOrders.Select(o => new Order(
-            o.ID,
-            o.Client,
+            o.DocEntry,
+            o.CardCode,
             DateOnly.FromDateTime(o.OrderDate),
-            DateOnly.FromDateTime(o.DueDate),
+            DateOnly.FromDateTime(o.DocDueDate),
             o.LineItems.Count
         )).ToList();
 
@@ -298,10 +298,10 @@
             List<int> ordersWithMissingBatches = new List<int>();
             foreach (var order in processedOrders)
             {
-                bool allAssigned = await _batchService.AllOrderLinesHaveBatchesAsync(order.ID);
+                bool allAssigned = await _batchService.AllOrderLinesHaveBatchesAsync(order.DocEntry);
                 if (!allAssigned)
                 {
-                    ordersWithMissingBatches.Add(order.ID);
+                    ordersWithMissingBatches.Add(order.DocEntry);
                 }
             }
 
@@ -310,10 +310,13 @@
             {
                 var message = new StringBuilder();
                 message.AppendLine("Las siguientes comandas tienen productos sin lotes asignados:");
+                message.AppendLine("<br>");
                 foreach (var orderId in ordersWithMissingBatches)
                 {
                     message.AppendLine($"- Comanda {orderId}");
                 }
+
+                message.AppendLine("<br>");
                 message.AppendLine("\n¿Desea continuar y asignar lotes automáticamente?");
 
                 var dialogResult = await _dialogService.ShowConfirmationAsync(
@@ -338,9 +341,11 @@
             // Mostrar resumen de las órdenes a procesar
             var summary = new StringBuilder();
             summary.AppendLine($"Se procesarán {processedOrders.Count} comandas:");
+            summary.AppendLine("<br>");
+
             foreach (var order in processedOrders)
             {
-                summary.AppendLine($"- Orden {order.ID}: {order.Client}, {order.LineItems.Count} líneas");
+                summary.AppendLine($"- Orden {order.DocEntry}: {order.CardCode}, {order.LineItems.Count} líneas");
             }
 
             // Confirmación antes de procesar
@@ -364,15 +369,28 @@
                 await Task.Delay(500); // Simulación de procesamiento por orden
 
                 // Opcional: confirmar cada orden en SAP
-                bool sapResult = await _orderService.ConfirmOrderToSAP(order.ID);
+                bool sapResult = await _orderService.ConfirmOrderToSAP(order.DocEntry);
                 if (!sapResult)
                 {
-                    await _dialogService.ShowWarningAsync($"Advertencia: La orden {order.ID} no se pudo confirmar en SAP.", "Advertencia");
+                    await _dialogService.ShowWarningAsync($"Advertencia: La orden {order.DocEntry} no se pudo confirmar en SAP.", "Advertencia");
                 }
             }
 
-            // Mostrar mensaje de éxito
-            await _dialogService.ShowInfoAsync($"Se han procesado {processedOrders.Count} comandas con éxito.", "Éxito");
+            // Convertir las órdenes a formato JSON para mostrar y para la API
+            string jsonOrders = ConvertOrdersToJson(processedOrders);
+
+            // Crear mensaje simple sin HTML
+            var successMessage = new StringBuilder();
+            successMessage.AppendLine($"Se han procesado {processedOrders.Count} comandas con éxito.");
+            successMessage.AppendLine("");
+            successMessage.AppendLine("JSON generado para API:");
+            successMessage.AppendLine("");
+            successMessage.AppendLine(jsonOrders);
+
+            // Mostrar diálogo de éxito con el JSON
+            await _dialogService.ShowInfoAsync(
+                successMessage.ToString(),
+                "Éxito");
 
             // Limpiar después de procesar
             processedOrders.Clear();
@@ -389,6 +407,42 @@
         {
             isLoading = false;
             StateHasChanged();
+        }
+    }
+
+    // Método auxiliar para convertir las órdenes a formato JSON
+    private string ConvertOrdersToJson(List<OrderData> orders)
+    {
+        try
+        {
+            // Crear un objeto anónimo que represente las órdenes en el formato deseado para la API
+            var apiOrders = orders.Select(o => new
+            {
+                id = o.DocEntry,
+                client = o.CardCode,
+                orderDate = o.OrderDate.ToString("yyyy-MM-dd"),
+                dueDate = o.DocDueDate.ToString("yyyy-MM-dd"),
+                lines = o.LineItems.Select(li => new
+                {
+                    lineNumber = li.LineNum + 1,
+                    itemCode = li.ItemCode,
+                    quantity = li.Quantity,
+                    batch = li.Batch
+                }).ToList()
+            }).ToList();
+
+            // Serializar a JSON con formato indentado para mejor visualización
+            var options = new System.Text.Json.JsonSerializerOptions
+                {
+                    WriteIndented = true
+                };
+
+            return System.Text.Json.JsonSerializer.Serialize(apiOrders, options);
+        }
+        catch (Exception ex)
+        {
+            // En caso de error, devolver mensaje de error como JSON
+            return $"{{ \"error\": \"Error al generar JSON: {ex.Message}\" }}";
         }
     }
 
@@ -444,13 +498,13 @@
             if (selectedOrder != null)
             {
                 // Recargar los detalles de la orden seleccionada
-                var orderData = processedOrders.FirstOrDefault(o => o.ID == selectedOrder.ID);
+                var orderData = processedOrders.FirstOrDefault(o => o.DocEntry == selectedOrder.ID);
                 if (orderData != null && orderData.LineItems.Any())
                 {
                     // Convertir las líneas al formato para la grid
                     var lineItems = orderData.LineItems
                         .Select(li => new OrderLineItem(
-                            li.LineNumber,
+                            li.LineNum,
                             li.ItemCode,
                             li.Quantity,
                             li.Batch

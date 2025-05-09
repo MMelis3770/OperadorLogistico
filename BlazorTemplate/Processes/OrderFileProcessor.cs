@@ -84,13 +84,13 @@ public class OrderFileProcessor
                         {
                             currentOrder = new OrderData
                             {
-                                ID = int.Parse(parts[1].Trim()),
-                                Client = parts[2].Trim(),
+                                DocEntry = int.Parse(parts[1].Trim()),
+                                CardCode = parts[2].Trim(),
                                 OrderDate = DateTime.Parse(parts[3].Trim()),
-                                DueDate = DateTime.Parse(parts[4].Trim())
+                                DocDueDate = DateTime.Parse(parts[4].Trim())
                             };
 
-                            Console.WriteLine($"Nueva orden: ID={currentOrder.ID}, Cliente={currentOrder.Client}");
+                            Console.WriteLine($"Nueva orden: ID={currentOrder.DocEntry}, Cliente={currentOrder.CardCode}");
                         }
                         catch (Exception ex)
                         {
@@ -112,17 +112,17 @@ public class OrderFileProcessor
                         {
                             var lineItem = new LineItem
                             {
-                                OrderID = int.Parse(parts[1].Trim()),
-                                LineNumber = int.Parse(parts[2].Trim()),
+                                DocEntry = int.Parse(parts[1].Trim()),
+                                LineNum = int.Parse(parts[2].Trim()),
                                 ItemCode = parts[3].Trim(),
                                 Quantity = int.Parse(parts[4].Trim()),
                             };
 
                             // Verificar que la línea corresponde a la orden actual
-                            if (lineItem.OrderID == currentOrder.ID)
+                            if (lineItem.DocEntry == currentOrder.DocEntry)
                             {
                                 currentOrder.LineItems.Add(lineItem);
-                                Console.WriteLine($"Línea añadida: Orden={lineItem.OrderID}, Línea={lineItem.LineNumber}, Item={lineItem.ItemCode}");
+                                Console.WriteLine($"Línea añadida: Orden={lineItem.DocEntry}, Línea={lineItem.LineNum}, Item={lineItem.ItemCode}");
                             }
                             else
                             {

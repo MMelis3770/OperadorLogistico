@@ -8,8 +8,8 @@ namespace BlazorTemplate.Models
 {
     public class LineItem
     {
-        public int OrderID { get; set; }
-        public int LineNumber { get; set; }
+        public int DocEntry { get; set; }
+        public int LineNum { get; set; }
         public string ItemCode { get; set; }
         public int Quantity { get; set; }
         public string Batch { get; set; }

@@ -8,10 +8,10 @@ namespace BlazorTemplate.Models
 {
     public class OrderData
     {
-        public int ID { get; set; }
-        public string Client { get; set; }
+        public int DocEntry { get; set; }
+        public string CardCode { get; set; }
         public DateTime OrderDate { get; set; }
-        public DateTime DueDate { get; set; }
+        public DateTime DocDueDate { get; set; }
         public List<LineItem> LineItems { get; set; } = new List<LineItem>();
 
     }
