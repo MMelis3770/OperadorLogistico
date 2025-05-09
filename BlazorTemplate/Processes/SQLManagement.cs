@@ -1,5 +1,7 @@
-﻿using BlazorTemplate.Models;
+﻿using System.Data.Common;
+using BlazorTemplate.Models;
 using DatabaseConnection;
+using DatabaseConnection.Enum;
 using Microsoft.Extensions.Configuration;
 namespace BlazorTemplate.Processes
 {
@@ -84,9 +86,75 @@ namespace BlazorTemplate.Processes
             return batches != null && batches.Any();
         }
 
+
         public void LoadOrdersToSQL(List<OrderData> ordersToSQL)
         {
-            string insertQuery = "INSERT INTO dbo.Comandas"
+            if (ordersToSQL == null || !ordersToSQL.Any())
+                throw new ArgumentException("No orders to insert");
+
+            try
+            {
+                // Iniciar transacción
+                _connection.StartTransaction();
+
+                try
+                {
+                    foreach (var order in ordersToSQL)
+                    {
+                        // Insertar en la tabla Orders
+                        string insertOrderQuery = @"
+                        INSERT INTO dbo.Orders (DocEntry, CardCode, OrderDate, DocDueDate) 
+                        VALUES (@DocEntry, @CardCode, @OrderDate, @DocDueDate)";
+
+                        var orderParameters = new List<object>
+                    {
+                        new
+                        {
+                            DocEntry = order.DocEntry,
+                            CardCode = order.CardCode,
+                            OrderDate = order.OrderDate,
+                            DocDueDate = order.DocDueDate
+                        }
+                        };
+
+                        _connection.Execute(insertOrderQuery, orderParameters);
+
+                        // Insertar las líneas de la orden
+                        if (order.LineItems != null && order.LineItems.Any())
+                        {
+                            string insertLineQuery = @"
+                            INSERT INTO dbo.OrderLines (DocEntry, LineNum, ItemCode, Quantity) 
+                            VALUES (@DocEntry, @LineNum, @ItemCode, @Quantity)";
+
+                            var lineItemsParameters = order.LineItems.Select(line => new
+                            {
+                                DocEntry = order.DocEntry,  // Usar el DocEntry de la orden padre
+                                LineNum = line.LineNum,
+                                ItemCode = line.ItemCode,
+                                Quantity = line.Quantity
+                            }).ToList();
+
+                            _connection.Execute(insertLineQuery, lineItemsParameters);
+                        }
+                    }
+
+                    // Commit de la transacción si todo salió bien
+                    _connection.EndTransaction(EndTransactionType.Commit);
+                }
+                catch (Exception)
+                {
+                    // Rollback en caso de error
+                    if (_connection.InTransaction)
+                    {
+                        _connection.EndTransaction(EndTransactionType.Rollback);
+                    }
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error loading orders to SQL: {ex.Message}", ex);
+            }
+        }
         }
     }
-}
