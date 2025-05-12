@@ -1,8 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.VisualBasic;
+using SAPbobsCOM;
 using SEIDOR_SLayer;
 using SeidorSmallWebApi.Entities;
 using System.Text.Json;
+using System.Threading;
 
 namespace SeidorSmallWebApi.CustomControllers.Controllers;
 
@@ -30,19 +33,14 @@ public class OrderController : ControllerBase
             if (orderRequest == null)
                 return BadRequest("Order data is required");
 
-            // Validacions
-            if (string.IsNullOrEmpty(orderRequest.client))
-                return BadRequest("Client code is required");
 
             if (orderRequest.lines == null || !orderRequest.lines.Any())
                 return BadRequest("At least 1 line item is required");
 
-            // Transformar a format SAP
             var sapOrder = TransformToSapOrder(orderRequest);
 
             // Enviar a SAP
-            var batchRequest = new SLBatchRequest(HttpMethod.Post, "Orders", sapOrder).WithReturnNoContent();
-            var result = await SendToSAP(new List<SLBatchRequest> { batchRequest });
+            var result = await SendToSAP();
 
             if (result.errorCount > 0)
             {
@@ -68,55 +66,31 @@ public class OrderController : ControllerBase
         // Transformació del model de l'API al model de SAP
         var documentLines = order.lines.Select(line => new
         {
-            ItemCode = line.itemCode,
-            Quantity = line.quantity,
-            BatchNumbers = !string.IsNullOrEmpty(line.batch) ? new[]
-            {
-                new { BatchNumber = line.batch, Quantity = line.quantity }
-            } : null
-        }).ToList();
-
+            DocEntry = line.DocEntry,
+            LineNum = line.LineNum,
+            ItemCode = line.ItemCode,
+            Quantity = line.Quantity,
+            Batch = line.Batch
+        });
         return new
         {
-            CardCode = order.client,
-            DocDate = order.orderDate,
-            DocDueDate = order.dueDate,
-            DocumentLines = documentLines
+            DocEntry = order.DocEntry,
+            CardCode = order.CardCode,
+            DocDate = order.DocDate,
+            DocDueDate = order.DocDueDate,
+            Status = order.Status,
+            ErrorMsg = order.ErrorMsg
         };
     }
 
-    public async Task<(int successCount, int errorCount, string errorMessages)> SendToSAP(List<SLBatchRequest> batchRequests)
+    [NonAction]
+    public async Task<(int successCount, int errorCount, string errorMessages)> SendToSAP()
     {
-        try
-        {
-            HttpResponseMessage[] batchResult = await _slConnection.PostBatchAsync(batchRequests);
+        string QueryOrder = "INSERT INTO[@CONF_ORDERS] (DocEntry, CardCode, DocDate, DocDueDate, Status, ErrorMsg) VALUES('X', 'X', '2025-05-12', '2025-05-20', 'C', '')";
 
-            int successCount = 0;
-            int errorCount = 0;
-            List<string> errorMessages = new List<string>();
 
-            foreach (var response in batchResult)
-            {
-                if (response.IsSuccessStatusCode)
-                {
-                    successCount++;
-                }
-                else
-                {
-                    errorCount++;
-                    string errorContent = await response.Content.ReadAsStringAsync();
-                    errorMessages.Add(errorContent);
-                    _logger.LogError($"SAP API error: {errorContent}");
-                }
-            }
-
-            return (successCount, errorCount, string.Join("; ", errorMessages));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending data to SAP");
-            return (0, batchRequests.Count, ex.Message);
-        }
+        
+        string QueryOrderLines = "INSERT INTO[@CONF_ORDERLINES] (DocEntry, LineNum, ItemCode, Quantity, Batch) VALUES(Mateix DOC entry que a dal, 0, 'A001', 5, 'B001')";
     }
 }
 
