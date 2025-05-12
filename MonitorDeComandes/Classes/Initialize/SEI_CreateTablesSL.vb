@@ -6,10 +6,8 @@ Imports SEIDOR_SLayer
 
 Public Class SEI_CreateTablesSL
 
-
-
-
     Public Async Function AddUserTables() As Task
+
         'Await CreateUserDataDefinedField()
         Await CreateUDO()
 
@@ -18,6 +16,7 @@ Public Class SEI_CreateTablesSL
     Private Async Function CreateUserDataDefinedField() As Threading.Tasks.Task
 
         Await CreateUserDataField("ORDR", "OrdersStatus", "OrdersStatus", BoFieldTypes.db_Alpha, 50)
+
     End Function
     Private Async Function CreateUDO() As Task
         Const tableHeader As String = "CONF_ORDERS"
@@ -29,25 +28,20 @@ Public Class SEI_CreateTablesSL
             Await CreateUserTables(tableDetail, detailDescription, BoUTBTableType.bott_DocumentLines)
 
             Await CreateUserDataField("@" & tableHeader, "DocEntry", "Order ID", BoFieldTypes.db_Numeric, 10)
-            Await CreateUserDataField("@" & tableHeader, "DocNum", "Order Number", BoFieldTypes.db_Numeric, 10)
+            Await CreateUserDataField("@" & tableHeader, "CardCode", "Customer Code", BoFieldTypes.db_Numeric, 10)
+            Await CreateUserDataField("@" & tableHeader, "DocDate", "Document Date", BoFieldTypes.db_Date)
+            Await CreateUserDataField("@" & tableHeader, "DocDueDate", "Delivery Date", BoFieldTypes.db_Date)
 
-            Dim statusCodes As String() = {"P", "C", "E"}
-            Dim statusNames As String() = {"Pending", "Confirmed", "Error"}
-            Await CreateUserDataField("@" & tableHeader, "Status", "Status", BoFieldTypes.db_Alpha, 1,
-              codesValidValues:=statusCodes, namesValidValues:=statusNames)
-
-            Await CreateUserDataField("@" & tableHeader, "ConfDate", "Confirmation Date", BoFieldTypes.db_Date)
+            Dim statusCodes As String() = {"C", "E"}
+            Dim statusNames As String() = {"Confirmed", "Error"}
+            Await CreateUserDataField("@" & tableHeader, "Status", "Status", BoFieldTypes.db_Alpha, 1, codesValidValues:=statusCodes, namesValidValues:=statusNames)
             Await CreateUserDataField("@" & tableHeader, "ErrorMsg", "Error Message", BoFieldTypes.db_Alpha, 254)
 
             Await CreateUserDataField("@" & tableDetail, "DocEntry", "Order ID", BoFieldTypes.db_Numeric, 10)
             Await CreateUserDataField("@" & tableDetail, "LineNum", "Line Number", BoFieldTypes.db_Numeric, 3)
             Await CreateUserDataField("@" & tableDetail, "ItemCode", "Item Code", BoFieldTypes.db_Alpha, 20)
             Await CreateUserDataField("@" & tableDetail, "Quantity", "Quantity", BoFieldTypes.db_Float, 10, BoFldSubTypes.st_Quantity)
-            Await CreateUserDataField("@" & tableDetail, "LotNumber", "Lot Number", BoFieldTypes.db_Alpha, 50)
-            Await CreateUserDataField("@" & tableDetail, "LineStatus", "Line Status", BoFieldTypes.db_Alpha, 1,
-              codesValidValues:=statusCodes, namesValidValues:=statusNames)
-            Await CreateUserDataField("@" & tableDetail, "ErrorMsg", "Line Error", BoFieldTypes.db_Alpha, 254)
-
+            Await CreateUserDataField("@" & tableDetail, "Batch", "Batch Code", BoFieldTypes.db_Alpha, 50)
 
             Await CreateUserUDO(
                 name:=tableHeader,

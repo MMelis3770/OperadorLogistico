@@ -16,11 +16,14 @@ Public Class SEI_ConfOrders
 
 #Region "CONSTANTES"
     Private Structure FormControls
-        Public Const btnAdd As String = "1"
-        Public Const btnUpdate As String = "2"
-        Public Const btnRemove As String = "3"
-        Public Const btnCancel As String = "4"
-        Public Const btnRefresh As String = "5"
+        Const btnAdd As String = "1"
+        Const btnCancel As String = "2"
+
+        Const et_DocEntry As String = "1_U_E"
+        Const et_CardCode As String = "0_U_E"
+        Const CFL_DocEntry As String = "CFL_0"
+        Const CFL_CardCode As String = "CFL_1"
+
     End Structure
 #End Region
 
@@ -32,12 +35,6 @@ Public Class SEI_ConfOrders
 
     Private Sub Initialize()
         Try
-            SetFormReadOnly()
-
-            AddHandler SBO_Application.FormDataEvent, AddressOf InterceptUDOFormDataEvent
-            AddHandler SBO_Application.ItemEvent, AddressOf InterceptUDOItemEvent
-            AddHandler SBO_Application.MenuEvent, AddressOf InterceptUDOMenuEvent
-
             Me.Form.Visible = True
         Catch ex As Exception
             SBO_Application.StatusBar.SetText("Error al cargar la pantalla 'Confirmation Orders'", SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
@@ -45,66 +42,52 @@ Public Class SEI_ConfOrders
         End Try
     End Sub
 
-    Protected Overrides Sub Finalize()
-        Try
-            RemoveHandler SBO_Application.FormDataEvent, AddressOf InterceptUDOFormDataEvent
-            RemoveHandler SBO_Application.ItemEvent, AddressOf InterceptUDOItemEvent
-            RemoveHandler SBO_Application.MenuEvent, AddressOf InterceptUDOMenuEvent
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText("Error al finalizar la pantalla 'Confirmation Orders'", SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
-        End Try
-        MyBase.Finalize()
-    End Sub
+
+
 #End Region
 
 #Region "FUNCIONES EVENTOS"
     Public Overrides Sub HANDLE_DATA_EVENT(ByRef BusinessObjectInfo As SAPbouiCOM.BusinessObjectInfo, ByRef BubbleEvent As Boolean)
-        If BusinessObjectInfo.FormTypeEx = UDO_FormType Then
-            If BusinessObjectInfo.EventType = BoEventTypes.et_FORM_DATA_ADD Or
-               BusinessObjectInfo.EventType = BoEventTypes.et_FORM_DATA_UPDATE Then
-
-                BubbleEvent = False
-                SBO_Application.StatusBar.SetText("No está permitido añadir o modificar registros en este objeto", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-            End If
-        End If
     End Sub
 
-    Public Overrides Sub HANDLE_FORM_EVENTS(ByVal FormUID As String, ByRef pVal As SAPbouiCOM.ItemEvent, ByRef BubbleEvent As Boolean)
-        Try
-            If Me.Form.UniqueID = FormUID Then
-                If Trim(pVal.ItemUID) <> "" Then
-                    Select Case pVal.ItemUID
+    Public Overrides Sub HANDLE_FORM_EVENTS(FormUID As String, ByRef pVal As ItemEvent, ByRef BubbleEvent As Boolean)
+
+
+        If Trim(pVal.ItemUID) <> "" Then
+            Select Case pVal.ItemUID
+                Case FormControls.et_DocEntry
+                    Select Case pVal.EventType
+                        Case SAPbouiCOM.BoEventTypes.et_CHOOSE_FROM_LIST
+                            Me.HandleChooseFromListEvent(pVal, BubbleEvent)
                     End Select
-                End If
+                Case FormControls.et_CardCode
+                    Select Case pVal.EventType
+                        Case SAPbouiCOM.BoEventTypes.et_CHOOSE_FROM_LIST
+                            Me.HandleChooseFromListEvent(pVal, BubbleEvent)
+                    End Select
+            End Select
 
-                If pVal.EventType = BoEventTypes.et_CLICK And pVal.BeforeAction Then
-                    If pVal.ItemUID = FormControls.btnAdd Or
-                       pVal.ItemUID = FormControls.btnUpdate Or
-                       pVal.ItemUID = FormControls.btnRemove Then
+        Else
+            '
+            'Eventos de Formulario
+            '
+            Select Case pVal.EventType
+                Case SAPbouiCOM.BoEventTypes.et_FORM_ACTIVATE
+                    '
+                Case SAPbouiCOM.BoEventTypes.et_FORM_LOAD
+                    ' AFTER
+                    ' Se captura al inicializar la clase Initialize()
+                Case SAPbouiCOM.BoEventTypes.et_FORM_CLOSE
 
-                        BubbleEvent = False
-                        SBO_Application.StatusBar.SetText("No está permitido añadir o modificar registros", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                    End If
-                End If
-            End If
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText($"Error en la pantalla: {ex.Message}", SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
-        End Try
+                Case SAPbouiCOM.BoEventTypes.et_FORM_UNLOAD
+
+                Case SAPbouiCOM.BoEventTypes.et_FORM_RESIZE
+
+            End Select
+        End If
     End Sub
 
     Public Overrides Sub HANDLE_MENU_EVENTS(ByRef pVal As SAPbouiCOM.MenuEvent, ByRef BubbleEvent As Boolean)
-        If pVal.BeforeAction Then
-            If pVal.MenuUID = "1282" Or
-               pVal.MenuUID = "1281" Then
-
-                Dim oForm As SAPbouiCOM.Form = SBO_Application.Forms.ActiveForm
-
-                If oForm.TypeEx = UDO_FormType Then
-                    BubbleEvent = False
-                    SBO_Application.StatusBar.SetText("No está permitido añadir o modificar registros en este objeto", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                End If
-            End If
-        End If
     End Sub
 
     Public Overrides Sub HANDLE_PRINT_EVENT(ByRef eventInfo As SAPbouiCOM.PrintEventInfo, ByRef BubbleEvent As Boolean)
@@ -130,163 +113,78 @@ Public Class SEI_ConfOrders
 
     Public Overrides Sub HANDLE_WIDGET_EVENTS(ByRef pWidgetData As SAPbouiCOM.WidgetData, ByRef BubbleEvent As Boolean)
     End Sub
+    Private Sub HandleChooseFromListEvent(ByRef pVal As SAPbouiCOM.ItemEvent, ByRef BubbleEvent As Boolean)
+        Dim oCFLEvento As SAPbouiCOM.IChooseFromListEvent = Nothing
+        Dim oDataTable As SAPbouiCOM.DataTable = Nothing
+        Dim oEditText As SAPbouiCOM.EditText = Nothing
+        Dim stNartText As SAPbouiCOM.StaticText = Nothing
+
+        Try
+            If pVal.EventType = SAPbouiCOM.BoEventTypes.et_CHOOSE_FROM_LIST Then
+                oCFLEvento = DirectCast(pVal, SAPbouiCOM.IChooseFromListEvent)
+                oDataTable = oCFLEvento.SelectedObjects
+
+                If Not oDataTable Is Nothing AndAlso oDataTable.Rows.Count > 0 Then
+                    Select Case pVal.ItemUID
+                        Case FormControls.et_DocEntry
+                            Dim docEntry As String = oDataTable.GetValue("DocEntry", 0).ToString()
+                            oEditText = DirectCast(Me.Form.Items.Item(FormControls.et_DocEntry).Specific, SAPbouiCOM.EditText)
+                            oEditText.Value = docEntry
+
+                            Dim docNum As String = oDataTable.GetValue("DocNum", 0).ToString()
+                            SBO_Application.StatusBar.SetText("Pedido seleccionado: " & docNum, SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Success)
+
+                        Case FormControls.et_CardCode
+                            Dim cardCode As String = oDataTable.GetValue("CardCode", 0).ToString()
+                            Dim cardName As String = oDataTable.GetValue("CardName", 0).ToString()
+
+                            oEditText = DirectCast(Me.Form.Items.Item(FormControls.et_CardCode).Specific, SAPbouiCOM.EditText)
+                            oEditText.Value = cardCode
+
+                            SBO_Application.StatusBar.SetText("Cliente seleccionado: " & cardName, SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Success)
+                    End Select
+                End If
+            End If
+        Catch ex As Exception
+            Me.SBO_Application.SetStatusBarMessage("ERROR HandleChooseFromListEvent: " & ex.Message, SAPbouiCOM.BoMessageTime.bmt_Short, True)
+        Finally
+            LiberarObjCOM(oCFLEvento)
+            LiberarObjCOM(oDataTable)
+            LiberarObjCOM(oEditText)
+            LiberarObjCOM(stNartText)
+        End Try
+    End Sub
 #End Region
 
 #Region "FUNCIONES FORM"
 
-    Private Sub SetFormReadOnly()
+    Public Sub FilterOrdersByCustomer(ByVal cardCode As String)
         Try
-            If Me.Form IsNot Nothing Then
-                Me.Form.Mode = BoFormMode.fm_VIEW_MODE
-
-                If Me.Form.Items.Item(FormControls.btnAdd) IsNot Nothing Then
-                    Me.Form.Items.Item(FormControls.btnAdd).Enabled = False
-                End If
-
-                If Me.Form.Items.Item(FormControls.btnUpdate) IsNot Nothing Then
-                    Me.Form.Items.Item(FormControls.btnUpdate).Enabled = False
-                End If
-
-            End If
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText("El botón/acción no existe", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-        End Try
-    End Sub
-#End Region
-
-#Region "INTERCEPTORES DE EVENTOS UDO"
-
-    Private Sub InterceptUDOFormDataEvent(ByRef BusinessObjectInfo As SAPbouiCOM.BusinessObjectInfo, ByRef BubbleEvent As Boolean)
-        Try
-            If BusinessObjectInfo.FormTypeEx = UDO_FormType Or
-               BusinessObjectInfo.Type = UDO_ObjectName Then
-
-                If BusinessObjectInfo.EventType = BoEventTypes.et_FORM_DATA_ADD Or
-                   BusinessObjectInfo.EventType = BoEventTypes.et_FORM_DATA_UPDATE Or
-                   BusinessObjectInfo.EventType = BoEventTypes.et_FORM_DATA_DELETE Then
-
-                    If BusinessObjectInfo.BeforeAction Then
-                        BubbleEvent = False
-                        SBO_Application.StatusBar.SetText("No está permitido modificar este objeto de negocio", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                    End If
-                End If
-            End If
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText("Error interceptando add, updato o remove", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-        End Try
-    End Sub
-
-    Private Sub InterceptUDOItemEvent(ByVal FormUID As String, ByRef pVal As SAPbouiCOM.ItemEvent, ByRef BubbleEvent As Boolean)
-        Try
-            Dim oForm As SAPbouiCOM.Form = Nothing
-
-            Try
-                oForm = SBO_Application.Forms.Item(FormUID)
-                If oForm.TypeEx <> UDO_FormType Then
-                    Return
-                End If
-            Catch
+            If String.IsNullOrEmpty(cardCode) Then
                 Return
-            End Try
-
-            If pVal.BeforeAction Then
-                If pVal.EventType = BoEventTypes.et_CLICK Then
-                    If pVal.ItemUID = "1" Or
-                       pVal.ItemUID = "2" Or
-                       pVal.ItemUID = "3" Then
-
-                        BubbleEvent = False
-                        SBO_Application.StatusBar.SetText("No está permitido modificar este objeto de negocio", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                    End If
-                End If
-
-                If pVal.EventType = BoEventTypes.et_COMBO_SELECT And pVal.ItemUID = "10002" Then
-                    BubbleEvent = False
-                    SBO_Application.StatusBar.SetText("No está permitido cambiar el modo de este formulario", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                End If
             End If
 
-            If pVal.EventType = BoEventTypes.et_FORM_LOAD And pVal.After Then
-                ConfigureUDOFormReadOnly(oForm)
-            End If
+            Dim oConditions As SAPbouiCOM.Conditions = SBO_Application.CreateObject(SAPbouiCOM.BoCreatableObjectType.cot_Conditions)
+            Dim oCondition As SAPbouiCOM.Condition = oConditions.Add()
+
+            oCondition.Alias = "CardCode"
+            oCondition.Operation = SAPbouiCOM.BoConditionOperation.co_EQUAL
+            oCondition.CondVal = cardCode
+
+            SetCFLCondition(FormControls.CFL_DocEntry, oConditions)
+
+            SBO_Application.StatusBar.SetText("Filtro aplicado: Mostrando pedidos del cliente " & cardCode, SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Success)
         Catch ex As Exception
-            SBO_Application.StatusBar.SetText("Error interceptando add, updato o remove", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-
+            SBO_Application.StatusBar.SetText("Error al filtrar pedidos: " & ex.Message, SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
         End Try
     End Sub
 
-    Private Sub InterceptUDOMenuEvent(ByRef pVal As SAPbouiCOM.MenuEvent, ByRef BubbleEvent As Boolean)
+    Public Sub SetCFLCondition(ByVal cflUID As String, ByVal conditions As SAPbouiCOM.Conditions)
         Try
-            If SBO_Application.Forms.ActiveForm.TypeEx = UDO_FormType Then
-                If pVal.BeforeAction Then
-                    If pVal.MenuUID = "1282" Or
-                       pVal.MenuUID = "1281" Or
-                       pVal.MenuUID = "1283" Or
-                       pVal.MenuUID = "1284" Or
-                       pVal.MenuUID = "1285" Or
-                       pVal.MenuUID = "1290" Or
-                       pVal.MenuUID = "1291" Then
-
-                        BubbleEvent = False
-                        SBO_Application.StatusBar.SetText("No está permitido modificar este objeto de negocio", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                    End If
-                End If
-            End If
+            Dim oCFL As SAPbouiCOM.ChooseFromList = Me.Form.ChooseFromLists.Item(cflUID)
+            oCFL.SetConditions(conditions)
         Catch ex As Exception
-            SBO_Application.StatusBar.SetText("Error interceptando add, updato o remove", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-        End Try
-    End Sub
-
-    Private Sub ConfigureUDOFormReadOnly(ByRef oForm As SAPbouiCOM.Form)
-        Try
-            oForm.Mode = BoFormMode.fm_VIEW_MODE
-
-            Dim standardButtons As String() = {"1", "2", "3"}
-
-            For Each btnID As String In standardButtons
-                Try
-                    Dim oItem As SAPbouiCOM.Item = oForm.Items.Item(btnID)
-                    oItem.Enabled = False
-                Catch
-                    SBO_Application.StatusBar.SetText("El botón no existe", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-
-                End Try
-            Next
-
-            For i As Integer = 0 To oForm.Items.Count - 1
-                Try
-                    Dim oItem As SAPbouiCOM.Item = oForm.Items.Item(i)
-
-                    If oItem.Type = BoFormItemTypes.it_EDIT Or
-                       oItem.Type = BoFormItemTypes.it_COMBO_BOX Or
-                       oItem.Type = BoFormItemTypes.it_CHECK_BOX Or
-                       oItem.Type = BoFormItemTypes.it_LINKED_BUTTON Then
-
-                        oItem.Enabled = False
-                    End If
-                Catch
-                    SBO_Application.StatusBar.SetText("Error", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                End Try
-            Next
-
-            For i As Integer = 0 To oForm.Items.Count - 1
-                Try
-                    Dim oItem As SAPbouiCOM.Item = oForm.Items.Item(i)
-
-                    If oItem.Type = BoFormItemTypes.it_MATRIX Or
-                       oItem.Type = BoFormItemTypes.it_GRID Then
-
-                        Dim oMatrix As SAPbouiCOM.Matrix = CType(oItem.Specific, SAPbouiCOM.Matrix)
-                        oMatrix.Item.Enabled = False
-                    End If
-                Catch
-                    SBO_Application.StatusBar.SetText("Error", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                End Try
-            Next
-
-            SBO_Application.StatusBar.SetText("Formulario abierto en modo de solo lectura", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Warning)
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText($"Error al configurar el formulario como solo lectura: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+            SBO_Application.StatusBar.SetText("Error al establecer condiciones del CFL: " & ex.Message, SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
         End Try
     End Sub
 #End Region
