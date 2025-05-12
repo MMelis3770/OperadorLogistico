@@ -20,8 +20,9 @@ Public Class SEI_ConfOrders
         Const btnCancel As String = "2"
 
         Const et_DocEntry As String = "1_U_E"
-        Const et_CardCode As String = "0_U_E"
         Const CFL_DocEntry As String = "CFL_0"
+
+        Const et_CardCode As String = "0_U_E"
         Const CFL_CardCode As String = "CFL_1"
 
     End Structure
@@ -41,8 +42,6 @@ Public Class SEI_ConfOrders
             Me.Form.Close()
         End Try
     End Sub
-
-
 
 #End Region
 
@@ -117,76 +116,46 @@ Public Class SEI_ConfOrders
         Dim oCFLEvento As SAPbouiCOM.IChooseFromListEvent = Nothing
         Dim oDataTable As SAPbouiCOM.DataTable = Nothing
         Dim oEditText As SAPbouiCOM.EditText = Nothing
-        Dim stNartText As SAPbouiCOM.StaticText = Nothing
 
         Try
             If pVal.EventType = SAPbouiCOM.BoEventTypes.et_CHOOSE_FROM_LIST Then
                 oCFLEvento = DirectCast(pVal, SAPbouiCOM.IChooseFromListEvent)
-                oDataTable = oCFLEvento.SelectedObjects
 
-                If Not oDataTable Is Nothing AndAlso oDataTable.Rows.Count > 0 Then
-                    Select Case pVal.ItemUID
-                        Case FormControls.et_DocEntry
-                            Dim docEntry As String = oDataTable.GetValue("DocEntry", 0).ToString()
-                            oEditText = DirectCast(Me.Form.Items.Item(FormControls.et_DocEntry).Specific, SAPbouiCOM.EditText)
-                            oEditText.Value = docEntry
+                If oCFLEvento.BeforeAction = False Then
+                    oDataTable = oCFLEvento.SelectedObjects
 
-                            Dim docNum As String = oDataTable.GetValue("DocNum", 0).ToString()
-                            SBO_Application.StatusBar.SetText("Pedido seleccionado: " & docNum, SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Success)
+                    If Not oDataTable Is Nothing AndAlso oDataTable.Rows.Count > 0 Then
+                        Select Case oCFLEvento.ChooseFromListUID
 
-                        Case FormControls.et_CardCode
-                            Dim cardCode As String = oDataTable.GetValue("CardCode", 0).ToString()
-                            Dim cardName As String = oDataTable.GetValue("CardName", 0).ToString()
+                            Case "CFL_0"
+                                Dim docEntry As String = oDataTable.GetValue("U_DocEntry", 0).ToString()
 
-                            oEditText = DirectCast(Me.Form.Items.Item(FormControls.et_CardCode).Specific, SAPbouiCOM.EditText)
-                            oEditText.Value = cardCode
+                                oEditText = DirectCast(Me.Form.Items.Item(FormControls.et_DocEntry).Specific, SAPbouiCOM.EditText)
+                                oEditText.Value = docEntry
 
-                            SBO_Application.StatusBar.SetText("Cliente seleccionado: " & cardName, SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Success)
-                    End Select
+                            Case "CFL_1"
+                                Dim cardCode As String = oDataTable.GetValue("U_CardCode", 0).ToString()
+
+                                oEditText = DirectCast(Me.Form.Items.Item(FormControls.et_CardCode).Specific, SAPbouiCOM.EditText)
+                                oEditText.Value = cardCode
+
+                        End Select
+                    End If
                 End If
             End If
         Catch ex As Exception
-            Me.SBO_Application.SetStatusBarMessage("ERROR HandleChooseFromListEvent: " & ex.Message, SAPbouiCOM.BoMessageTime.bmt_Short, True)
+            SBO_Application.SetStatusBarMessage("ERROR HandleChooseFromListEvent: " & ex.Message, SAPbouiCOM.BoMessageTime.bmt_Short, True)
         Finally
             LiberarObjCOM(oCFLEvento)
             LiberarObjCOM(oDataTable)
             LiberarObjCOM(oEditText)
-            LiberarObjCOM(stNartText)
         End Try
     End Sub
 #End Region
 
 #Region "FUNCIONES FORM"
 
-    Public Sub FilterOrdersByCustomer(ByVal cardCode As String)
-        Try
-            If String.IsNullOrEmpty(cardCode) Then
-                Return
-            End If
 
-            Dim oConditions As SAPbouiCOM.Conditions = SBO_Application.CreateObject(SAPbouiCOM.BoCreatableObjectType.cot_Conditions)
-            Dim oCondition As SAPbouiCOM.Condition = oConditions.Add()
-
-            oCondition.Alias = "CardCode"
-            oCondition.Operation = SAPbouiCOM.BoConditionOperation.co_EQUAL
-            oCondition.CondVal = cardCode
-
-            SetCFLCondition(FormControls.CFL_DocEntry, oConditions)
-
-            SBO_Application.StatusBar.SetText("Filtro aplicado: Mostrando pedidos del cliente " & cardCode, SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Success)
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText("Error al filtrar pedidos: " & ex.Message, SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
-        End Try
-    End Sub
-
-    Public Sub SetCFLCondition(ByVal cflUID As String, ByVal conditions As SAPbouiCOM.Conditions)
-        Try
-            Dim oCFL As SAPbouiCOM.ChooseFromList = Me.Form.ChooseFromLists.Item(cflUID)
-            oCFL.SetConditions(conditions)
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText("Error al establecer condiciones del CFL: " & ex.Message, SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
-        End Try
-    End Sub
 #End Region
 
 #Region "FUNCIONES GENERALES"
