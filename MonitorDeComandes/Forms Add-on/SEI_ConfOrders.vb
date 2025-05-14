@@ -15,14 +15,7 @@ Public Class SEI_ConfOrders
 
 #Region "CONSTANTES"
     Private Structure FormControls
-        Const btnAdd As String = "1"
-        Const btnCancel As String = "2"
 
-        Const et_U_DocEntry As String = "1_U_E"
-        Const CFL_U_DocEntry As String = "CFL_0"
-
-        Const et_DocEntry As String = "Item_1"
-        Const CFL_DocEntry As String = "CFL_2"
 
     End Structure
 #End Region
@@ -109,48 +102,7 @@ Public Class SEI_ConfOrders
 
 #Region "FUNCIONES FORM"
 
-    Private Sub ConfigurateChooseFromList()
 
-        'Dim oParams As SAPbouiCOM.ChooseFromListCreationParams = Nothing
-        'Dim oEdit As SAPbouiCOM.EditText = Nothing
-
-        'Try
-
-        '    ' U_DocEntry
-        '    oParams = SBO_Application.CreateObject(SAPbouiCOM.BoCreatableObjectType.cot_ChooseFromListCreationParams)
-        '    With oParams
-        '        .MultiSelection = False
-        '        .ObjectType = "17"
-        '        .UniqueID = "CFL_0"
-        '    End With
-        '    Me.Form.ChooseFromLists.Add(oParams)
-
-        '    oEdit = Me.Form.Items.Item(FormControls.et_U_DocEntry).Specific
-        '    oEdit.ChooseFromListUID = "CFL_0"
-        '    oEdit.ChooseFromListAlias = "DocEntry"
-
-        '    ' DocEntry
-        '    oParams = SBO_Application.CreateObject(SAPbouiCOM.BoCreatableObjectType.cot_ChooseFromListCreationParams)
-        '    With oParams
-        '        .MultiSelection = False
-        '        .ObjectType = "CONF_ORDERS"
-        '        .UniqueID = "CFL_2"
-        '    End With
-        '    Me.Form.ChooseFromLists.Add(oParams)
-
-        '    oEdit = Me.Form.Items.Item(FormControls.et_DocEntry).Specific
-        '    oEdit.ChooseFromListUID = "CFL_2"
-        '    oEdit.ChooseFromListAlias = "DocEntry"
-
-
-
-        'Catch ex As Exception
-        '    Throw New Exception("CrearChooseFromList() > " & ex.Message)
-        'Finally
-        '    mGlobals.LiberarObjCOM(oEdit)
-        '    mGlobals.LiberarObjCOM(oParams)
-        'End Try
-    End Sub
 #End Region
 
 #Region "FUNCIONES GENERALES"

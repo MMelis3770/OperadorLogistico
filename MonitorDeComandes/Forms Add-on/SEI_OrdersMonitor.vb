@@ -179,7 +179,7 @@ Public Class SEI_OrdersMonitor
 										                LEFT JOIN INV1 T3 ON D.DocEntry = T3.BaseEntry AND D1.LineNum = T3.BaseLine AND T3.BaseType = 15  
 										                INNER JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
                                                         LEFT JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
+                                                        LEFT JOIN [@CONFORDERS] T4 ON T0.DocEntry = T4.U_OrderId
                                                         GROUP BY 
                                                             T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
                                                             T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
@@ -220,7 +220,7 @@ Public Class SEI_OrdersMonitor
 									                LEFT JOIN INV1 T3 ON D.DocEntry = T3.BaseEntry AND D1.LineNum = T3.BaseLine AND T3.BaseType = 15  
 									                LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
 									                LEFT JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-									                LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
+									                LEFT JOIN [@CONFORDERS] T4 ON T0.DocEntry = T4.U_OrderId
 									                WHERE (T0.U_OrdersStatus = 'Sent'
 										                    OR T2.DocEntry IS NOT NULL 
 											                OR D.DocEntry IS NOT NULL
@@ -480,9 +480,9 @@ Public Class SEI_OrdersMonitor
 
     Private Function CreateDeliveryObject(docEntry As Integer) As Delivery
         Try
-            Dim response = Task.Run(Function() m_SBOAddon.oSLConnection.Request("CONF_ORDERS").Filter($"DocEntry eq {docEntry}").GetAsync(Of JObject)()).GetAwaiter().GetResult()
+            Dim response = Task.Run(Function() m_SBOAddon.oSLConnection.Request("CONFORDERS").Filter($"DocEntry eq {docEntry}").GetAsync(Of JObject)()).GetAwaiter().GetResult()
             If response Is Nothing Then
-                Throw New Exception($"Order with DocEntry {docEntry} not found in CONF_ORDERS")
+                Throw New Exception($"Order with DocEntry {docEntry} not found in CONFORDERS")
             End If
 
             Dim delivery As New Delivery()
@@ -493,7 +493,7 @@ Public Class SEI_OrdersMonitor
             delivery.Comments = $"Delivery created from confirmed order #{response("DocNum")}"
             delivery.WarehouseCode = "01"
 
-            Dim linesResponse = Task.Run(Function() m_SBOAddon.oSLConnection.Request("CONF_ORDERLINES").Filter($"DocEntry eq {docEntry}").GetAllAsync(Of JObject)()).GetAwaiter().GetResult()
+            Dim linesResponse = Task.Run(Function() m_SBOAddon.oSLConnection.Request("CONFORDERLINES").Filter($"DocEntry eq {docEntry}").GetAllAsync(Of JObject)()).GetAwaiter().GetResult()
             If linesResponse Is Nothing OrElse linesResponse.Count = 0 Then
                 Throw New Exception($"No lines found for order {docEntry} in CONF_ORDERLINES")
             End If
@@ -701,7 +701,7 @@ Public Class SEI_OrdersMonitor
 										                LEFT JOIN INV1 T3 ON D.DocEntry = T3.BaseEntry AND D1.LineNum = T3.BaseLine AND T3.BaseType = 15  
 										                INNER JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
                                                         LEFT JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
+                                                        LEFT JOIN [@CONFORDERS] T4 ON T0.DocEntry = T4.U_OrderId
                                                         GROUP BY 
                                                             T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
                                                             T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
@@ -742,7 +742,7 @@ Public Class SEI_OrdersMonitor
 									                LEFT JOIN INV1 T3 ON D.DocEntry = T3.BaseEntry AND D1.LineNum = T3.BaseLine AND T3.BaseType = 15  
 									                LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
 									                LEFT JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-									                LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
+									                LEFT JOIN [@CONFORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
 									                WHERE (T0.U_OrdersStatus = 'Sent'
 										                    OR T2.DocEntry IS NOT NULL 
 											                OR D.DocEntry IS NOT NULL
