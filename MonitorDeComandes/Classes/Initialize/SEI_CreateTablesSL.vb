@@ -19,16 +19,16 @@ Public Class SEI_CreateTablesSL
 
     End Function
     Private Async Function CreateUDO() As Task
-        Const tableHeader As String = "CONF_ORDERS"
+        Const tableHeader As String = "CONFORDERS"
         Const headerDescription As String = "Confirmed Orders Header"
-        Const tableDetail As String = "CONF_ORDERLINES"
+        Const tableDetail As String = "CONFORDERLINES"
         Const detailDescription As String = "Confirmed Order Lines"
         Try
             Await CreateUserTables(tableHeader, headerDescription, BoUTBTableType.bott_Document)
             Await CreateUserTables(tableDetail, detailDescription, BoUTBTableType.bott_DocumentLines)
 
-            Await CreateUserDataField("@" & tableHeader, "DocEntry", "Order ID", BoFieldTypes.db_Numeric, 10)
-            Await CreateUserDataField("@" & tableHeader, "CardCode", "Customer Code", BoFieldTypes.db_Numeric, 10)
+            Await CreateUserDataField("@" & tableHeader, "OrderId", "Order ID (DocEntry)", BoFieldTypes.db_Numeric, 10, linkedSystemObject:=BoObjectTypes.oOrders)
+            Await CreateUserDataField("@" & tableHeader, "CardCode", "Customer Code", BoFieldTypes.db_Alpha, 10, linkedSystemObject:=BoObjectTypes.oBusinessPartners)
             Await CreateUserDataField("@" & tableHeader, "DocDate", "Document Date", BoFieldTypes.db_Date)
             Await CreateUserDataField("@" & tableHeader, "DocDueDate", "Delivery Date", BoFieldTypes.db_Date)
 
@@ -37,7 +37,7 @@ Public Class SEI_CreateTablesSL
             Await CreateUserDataField("@" & tableHeader, "Status", "Status", BoFieldTypes.db_Alpha, 1, codesValidValues:=statusCodes, namesValidValues:=statusNames)
             Await CreateUserDataField("@" & tableHeader, "ErrorMsg", "Error Message", BoFieldTypes.db_Alpha, 254)
 
-            Await CreateUserDataField("@" & tableDetail, "DocEntry", "Order ID", BoFieldTypes.db_Numeric, 10)
+            Await CreateUserDataField("@" & tableDetail, "OrderId", "Order ID (DocEntry)", BoFieldTypes.db_Numeric, 10, linkedSystemObject:=BoObjectTypes.oOrders)
             Await CreateUserDataField("@" & tableDetail, "LineNum", "Line Number", BoFieldTypes.db_Numeric, 3)
             Await CreateUserDataField("@" & tableDetail, "ItemCode", "Item Code", BoFieldTypes.db_Alpha, 20)
             Await CreateUserDataField("@" & tableDetail, "Quantity", "Quantity", BoFieldTypes.db_Float, 10, BoFldSubTypes.st_Quantity)
