@@ -1,5 +1,6 @@
 ﻿Imports System.Collections.Generic
 Imports System.IO
+Imports System.Linq
 Imports System.Threading.Tasks
 Imports System.Xml.Linq
 Imports Newtonsoft.Json.Linq
@@ -15,7 +16,6 @@ Public Class SEI_OrdersMonitor
 #End Region
 
 #Region "CONSTANTES"
-
     Private Structure FormControls
         Const grid As String = "grid"
         Const DataTable As String = "DT_Orders"
@@ -25,6 +25,7 @@ Public Class SEI_OrdersMonitor
         Const btnFilter As String = "btFilter"
         Const cbOrderSt As String = "cbOrder"
         Const cbOperatorSt As String = "cbOper"
+        Const cbColor As String = "cbColor"
         Const etClient As String = "etClient"
     End Structure
 
@@ -113,11 +114,9 @@ Public Class SEI_OrdersMonitor
 #End Region
 
 #Region "FUNCIONES"
-
 #Region "INICIALIZADORES"
 
 #End Region
-
 #Region "HANDLERS"
 
     Private Sub HandleBtnFilter(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
@@ -131,201 +130,146 @@ Public Class SEI_OrdersMonitor
             Dim cbOrderSt As ComboBox = Me.Form.Items.Item(FormControls.cbOrderSt).Specific
             Dim cbOperatorSt As ComboBox = Me.Form.Items.Item(FormControls.cbOperatorSt).Specific
             Dim etClient As EditText = Me.Form.Items.Item(FormControls.etClient).Specific
+            Dim cbColor As ComboBox = Me.Form.Items.Item(FormControls.cbColor).Specific
 
             Dim orderStatus As String = If(cbOrderSt.Selected IsNot Nothing, cbOrderSt.Selected.Value, "").Trim()
             Dim operatorStatus As String = If(cbOperatorSt.Selected IsNot Nothing, cbOperatorSt.Selected.Value, "").Trim()
             Dim client As String = If(etClient IsNot Nothing, etClient.Value.Trim(), "")
+            Dim lineColor As String = If(cbColor.Selected IsNot Nothing, cbColor.Selected.Value, "").Trim()
 
             Dim query As String = $"SELECT * FROM (
-                                    SELECT 
-                                        '' AS Send,
-                                        SQ.DocEntry,
-                                        SQ.DocNum AS Document,
-                                        SQ.DocTotal AS DocTotal,
-                                        SQ.SlpName AS SalesEmployee,
-                                        SQ.DocDate AS Date,
-                                        SQ.DocDueDate AS DueDate,
-                                        SQ.CardCode AS Client,
-                                        SQ.CardName AS ClientName,
-                                        SQ.Invoice AS Invoice,
-                                        SQ.OrderStatus AS OrderStatus,
-                                        SQ.OperatorStatus AS OperatorStatus,
-                                        'Last 15 invoices' AS Status
-                                    FROM (
-                                        SELECT TOP 15 
-                                            T0.DocEntry,
-                                            T0.DocNum,
-                                            T0.DocTotal,
-                                            T1.SlpName,
-                                            T0.DocDate,
-                                            T0.DocDueDate,
-                                            T0.CardCode,
-                                            T0.CardName,
-                                            T2.DocEntry AS Invoice,
-                                            T0.U_OrdersStatus AS OrderStatus,
-                                            T4.U_Status AS OperatorStatus,
-                                            T2.DocDate AS InvoiceDocDate 
-                                        FROM ORDR T0
-                                        INNER JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                        INNER JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                        INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                        GROUP BY 
-                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                            T2.DocEntry, T0.U_OrdersStatus, T4.U_Status, T2.DocDate
-                                        ORDER BY T2.DocDate DESC
-                                    ) AS SQ
+                                                    SELECT 
+                                                        '' AS Send,
+                                                        SQ.DocEntry,
+                                                        SQ.DocNum AS Document,
+                                                        SQ.DocTotal AS DocTotal,
+                                                        SQ.SlpName AS SalesEmployee,
+                                                        SQ.DocDate AS DocumentDate,
+                                                        SQ.DocDueDate AS DueDate,
+										                SQ.Invoice,
+										                SQ.InvoiceDocNum,
+										                SQ.Delivery,
+										                SQ.DeliveryDocNum,
+                                                        SQ.CardCode AS Client,
+                                                        SQ.CardName AS ClientName,
+                                                        SQ.OrderStatus AS OrderStatus,
+                                                        SQ.OperatorStatus AS OperatorStatus,
+                                                        'Last 15 invoices' AS Status
+                                                    FROM (
+                                                        SELECT TOP 15 
+                                                            T0.DocEntry,
+                                                            T0.DocNum,
+                                                            T0.DocTotal,
+                                                            T1.SlpName,
+                                                            T0.DocDate,
+                                                            T0.DocDueDate,
+                                                            T0.CardCode,
+                                                            T0.CardName,
+                                                            T2.DocEntry AS Invoice,
+											                T2.DocNum AS InvoiceDocNum,
+											                D.DocEntry AS Delivery,
+											                D.DocNum AS DeliveryDocNum,
+                                                            T0.U_OrdersStatus AS OrderStatus,
+                                                            T4.U_Status AS OperatorStatus,
+                                                            T2.DocDate AS InvoiceDocDate 
+                                                        FROM ORDR T0
+										                INNER JOIN RDR1 R ON T0.DocEntry = R.DocEntry
+										                LEFT JOIN DLN1 D1 ON R.DocEntry = D1.BaseEntry AND R.LineNum = D1.BaseLine AND D1.BaseType = 17  
+										                INNER JOIN ODLN D ON D1.DocEntry = D.DocEntry
+										                LEFT JOIN INV1 T3 ON D.DocEntry = T3.BaseEntry AND D1.LineNum = T3.BaseLine AND T3.BaseType = 15  
+										                INNER JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
+                                                        LEFT JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
+                                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
+                                                        GROUP BY 
+                                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
+                                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
+                                                            T2.DocEntry,T2.DocNum,D.DocEntry,
+											                D.DocNum, T0.U_OrdersStatus, T4.U_Status, T2.DocDate
+                                                        ORDER BY T2.DocDate DESC
+                                                    ) AS SQ
 
-                                        UNION 
+                                                    UNION ALL
 
-                                        SELECT 
-                                            '' AS Send,
-                                            T0.DocEntry,
-                                            T0.DocNum AS Document,
-                                            T0.DocTotal AS DocTotal,
-                                            T1.SlpName AS SalesEmployee,
-                                            T0.DocDate AS Date,
-                                            T0.DocDueDate AS DueDate,
-                                            T0.CardCode AS Client,
-                                            T0.CardName AS ClientName,
-                                            T2.DocEntry AS Invoice,
-                                            T0.U_OrdersStatus AS OrderStatus,
-                                            T4.U_Status AS OperatorStatus,
-                                            'Sent' AS Status
-                                        FROM ORDR T0
-                                        LEFT JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                        LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                        INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                        WHERE T0.U_OrdersStatus = 'Sent'
-                                        GROUP BY 
-                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                            T2.DocEntry, T0.U_OrdersStatus, T4.U_Status
+									                SELECT 
+										                '' AS Send,
+										                T0.DocEntry,
+										                T0.DocNum AS Document,
+										                T0.DocTotal AS DocTotal,
+										                T1.SlpName AS SalesEmployee,
+										                T0.DocDate AS DocumentDate,
+										                T0.DocDueDate AS DueDate,
+										                ISNULL(T2.DocEntry, 0) AS Invoice,
+										                ISNULL(T2.DocNum, 0) AS InvoiceDocNum,
+										                ISNULL(D.DocEntry, 0) AS Delivery,
+										                ISNULL(D.DocNum, 0) AS DeliveryDocNum,
+										                T0.CardCode AS Client,
+										                T0.CardName AS ClientName,
+										                T0.U_OrdersStatus AS OrderStatus,
+										                T4.U_Status AS OperatorStatus,
+										                CASE
+											                WHEN T0.U_OrdersStatus = 'Sent' THEN 'Sent'
+											                WHEN T2.DocEntry IS NOT NULL THEN 'Invoiced'
+											                WHEN D.DocEntry IS NOT NULL THEN 'Delivered'
+											                WHEN T4.U_Status = 'Error' THEN 'Error'
+											                WHEN T4.U_Status = 'Confirmed' THEN 'Confirmed'
+										                END AS Status
+									                FROM ORDR T0
+									                INNER JOIN RDR1 R ON T0.DocEntry = R.DocEntry
+									                LEFT JOIN DLN1 D1 ON R.DocEntry = D1.BaseEntry AND R.LineNum = D1.BaseLine AND D1.BaseType = 17  
+									                LEFT JOIN ODLN D ON D1.DocEntry = D.DocEntry
+									                LEFT JOIN INV1 T3 ON D.DocEntry = T3.BaseEntry AND D1.LineNum = T3.BaseLine AND T3.BaseType = 15  
+									                LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
+									                LEFT JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
+									                LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
+									                WHERE (T0.U_OrdersStatus = 'Sent'
+										                    OR T2.DocEntry IS NOT NULL 
+											                OR D.DocEntry IS NOT NULL
+											                OR T4.U_Status IN ('Error', 'Confirmed'))
+											                AND T0.DocEntry NOT IN (
+												                SELECT TOP 15 T0.DocEntry
+												                FROM ORDR T0
+												                INNER JOIN RDR1 R ON T0.DocEntry = R.DocEntry
+												                LEFT JOIN DLN1 D1 ON R.DocEntry = D1.BaseEntry AND R.LineNum = D1.BaseLine AND D1.BaseType = 17  
+												                INNER JOIN ODLN D ON D1.DocEntry = D.DocEntry
+												                LEFT JOIN INV1 T3 ON D.DocEntry = T3.BaseEntry AND D1.LineNum = T3.BaseLine AND T3.BaseType = 15  
+												                INNER JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
+												                GROUP BY T0.DocEntry, T2.DocDate
+												                ORDER BY T2.DocDate DESC
+									                )
+									                GROUP BY 
+										                T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
+										                T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
+										                T2.DocEntry,T2.DocNum,D.DocEntry,
+										                D.DocNum, T0.U_OrdersStatus, T4.U_Status
 
-                                        UNION
+                                                    UNION ALL
 
-                                        SELECT 
-                                            '' AS Send,
-                                            T0.DocEntry,
-                                            T0.DocNum AS Document,
-                                            T0.DocTotal AS DocTotal,
-                                            T1.SlpName AS SalesEmployee,
-                                            T0.DocDate AS Date,
-                                            T0.DocDueDate AS DueDate,
-                                            T0.CardCode AS Client,
-                                            T0.CardName AS ClientName,
-                                            T2.DocEntry AS Invoice,
-                                            T0.U_OrdersStatus AS OrderStatus,
-                                            T4.U_Status AS OperatorStatus,
-                                            'Error' AS Status
-                                        FROM ORDR T0
-                                        LEFT JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                        LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                        INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                        WHERE T4.U_Status = 'Error'
-                                        GROUP BY 
-                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                            T2.DocEntry, T0.U_OrdersStatus, T4.U_Status
-
-                                        UNION
-
-                                        SELECT 
-                                            '' AS Send,
-                                            T0.DocEntry,
-                                            T0.DocNum AS Document,
-                                            T0.DocTotal AS DocTotal,
-                                            T1.SlpName AS SalesEmployee,
-                                            T0.DocDate AS Date,
-                                            T0.DocDueDate AS DueDate,
-                                            T0.CardCode AS Client,
-                                            T0.CardName AS ClientName,
-                                            T2.DocEntry AS Invoice,
-                                            T0.U_OrdersStatus AS OrderStatus,
-                                            T4.U_Status AS OperatorStatus,
-                                            'Partially Confirmed' AS Status
-                                        FROM ORDR T0
-                                        LEFT JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                        LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                        INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                        WHERE T4.U_Status = 'Partially Confirmed'
-                                        GROUP BY 
-                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                            T2.DocEntry, T0.U_OrdersStatus, T4.U_Status
-
-                                        UNION
-
-                                        SELECT 
-                                            '' AS Send,
-                                            T0.DocEntry,
-                                            T0.DocNum AS Document,
-                                            T0.DocTotal AS DocTotal,
-                                            T1.SlpName AS SalesEmployee,
-                                            T0.DocDate AS Date,
-                                            T0.DocDueDate AS DueDate,
-                                            T0.CardCode AS Client,
-                                            T0.CardName AS ClientName,
-                                            T2.DocEntry AS Invoice,
-                                            T0.U_OrdersStatus AS OrderStatus,
-                                            T4.U_Status AS OperatorStatus,
-                                            'Confirmed' AS Status
-                                        FROM ORDR T0
-                                        LEFT JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                        LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                        INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                        WHERE T4.U_Status = 'Confirmed'
-                                        GROUP BY 
-                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                            T2.DocEntry, T0.U_OrdersStatus, T4.U_Status
-
-                                        UNION
-
-                                        SELECT 
-                                            '' AS Send,
-                                            T0.DocEntry,
-                                            T0.DocNum AS Document,
-                                            T0.DocTotal AS DocTotal,
-                                            T1.SlpName AS SalesEmployee,
-                                            T0.DocDate AS Date,
-                                            T0.DocDueDate AS DueDate,
-                                            T0.CardCode AS Client,
-                                            T0.CardName AS ClientName,
-                                            T2.DocEntry AS Invoice,
-                                            T0.U_OrdersStatus AS OrderStatus,
-                                            T4.U_Status AS OperatorStatus,
-                                            'Pending' AS Status
-                                        FROM ORDR T0
-                                        LEFT JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                        LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                        INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                        WHERE T0.U_OrdersStatus is null 
-                                        AND T0.DocEntry NOT IN ( 
-                                                SELECT TOP 15 
-                                                    T0.DocEntry
-                                                FROM ORDR T0
-                                                INNER JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                                INNER JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                                INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                                LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                                GROUP BY 
-                                                    T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                                    T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                                    T2.DocEntry, T0.U_OrdersStatus, T4.U_Status, T2.DocDate
-                                                ORDER BY T2.DocDate DESC
-                                            )
-                                        GROUP BY 
-                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                            T2.DocEntry, T0.U_OrdersStatus, T4.U_Status) AS AllData 
-                                    WHERE 1=1"
+                                                    SELECT 
+                                                        '' AS Send,
+                                                        T0.DocEntry,
+                                                        T0.DocNum AS Document,
+                                                        T0.DocTotal AS DocTotal,
+                                                        T1.SlpName AS SalesEmployee,
+                                                        T0.DocDate AS DocumentDate,
+                                                        T0.DocDueDate AS DueDate,
+										                0 AS Invoice,
+										                0 AS InvoiceDocNum,
+										                0 AS Delivery,
+										                0 AS DeliveryDocNum,
+                                                        T0.CardCode AS Client,
+                                                        T0.CardName AS ClientName,
+                                                        NULL AS OrderStatus,
+                                                        NULL AS OperatorStatus, 
+                                                        'Pending' AS Status
+                                                    FROM ORDR T0
+                                                    LEFT JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
+									                INNER JOIN RDR1 R ON T0.DocEntry = R.DocEntry
+                                                    WHERE T0.DocStatus = 'O'
+                                                    GROUP BY 
+                                                        T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
+                                                        T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName) AS AllData 
+                                                    
+                                                    WHERE 1=1"
 
             If orderStatus <> "All" AndAlso orderStatus <> "" Then
                 If orderStatus = "Pending" Then
@@ -341,6 +285,31 @@ Public Class SEI_OrdersMonitor
 
             If client <> "" Then
                 query &= " AND Client = '" & client & "'"
+            End If
+
+            If lineColor <> "" Then
+                Select Case lineColor
+                    Case "Yellow"
+                        query &= " AND Status = 'Sent'"
+                    Case "Red"
+                        query &= " AND Status = 'Error'"
+                    Case "Light Green"
+                        query &= " AND Status = 'Confirmed'"
+                    Case "Green"
+                        query &= " AND Status = 'Delivered'"
+                    Case "Dark Green"
+                        query &= " AND Status = 'Invoiced'"
+                    Case "Light Blue"
+                        query &= " AND Status = 'Last 15 invoices'"
+                    Case "Gray"
+                        query &= " AND Status = 'Pending'
+                                         AND NOT (DATEDIFF(HOUR, GETDATE(), AllData.DueDate) <= 48 AND DATEDIFF(HOUR, GETDATE(), AllData.DueDate) >= 0)
+                                         AND NOT (AllData.DueDate < GETDATE())"
+                    Case "Orange"
+                        query &= " AND Status = 'Pending' AND DATEDIFF(HOUR, GETDATE(),AllData.DueDate) <= 48  AND DATEDIFF(HOUR,GETDATE(), AllData.DueDate) >= 0"
+                    Case "Dark Gray"
+                        query &= " AND Status = 'Pending' AND AllData.DueDate < GETDATE()"
+                End Select
             End If
 
             query &= " ORDER BY DueDate ASC"
@@ -378,7 +347,10 @@ Public Class SEI_OrdersMonitor
                 End If
 
                 For i As Integer = 0 To grid.Rows.Count - 1
-                    If grid.DataTable.GetValue("Send", i).ToString() = "Y" Then
+                    Dim sendChecked As String = grid.DataTable.GetValue("Send", i).ToString()
+                    Dim docDueDate As DateTime = grid.DataTable.GetValue("DueDate", i)
+
+                    If sendChecked = "Y" AndAlso docDueDate >= Date.Today Then
                         isOrderSelected = True
                         Dim docEntry As Integer = grid.DataTable.GetValue("DocEntry", i)
 
@@ -390,7 +362,8 @@ Public Class SEI_OrdersMonitor
                         Dim filePath As String = $"{basePath}Order_{docEntry}_{DateTime.Now:yyyy_MM_dd_HH_mm_ss}.txt"
                         GenerateOrderTxt(order, filePath)
                         PatchStatus(docEntry, "Sent").Wait()
-
+                    ElseIf docDueDate < Date.Today Then
+                        SBO_Application.StatusBar.SetText("Cannot proceed: document due date is overdue.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                     End If
                 Next
 
@@ -425,10 +398,15 @@ Public Class SEI_OrdersMonitor
                         isOrderSelected = True
                         Dim delivery = CreateDeliveryObject(docEntry)
                         PostDelivery(delivery).Wait()
+                        'Do post delivery. Fer el post de totes les deliveries marcades com a chek si                   
+                        'Si ha anat be PatchStatus tal i com esta, sino cridem la funcio pero
+                        'posatn no deliverered error delivering
                         Dim response = New DeliveryResponse()
 
                         If response.IsSuccess Then
                             PatchStatus(docEntry, "Delivered").Wait()
+                        Else
+                            PatchStatus(docEntry, "Error delivering").Wait()
                         End If
 
                     ElseIf sendChecked = "Y" And operatorStatus <> "C" Then
@@ -440,8 +418,9 @@ Public Class SEI_OrdersMonitor
                 If Not isOrderSelected Then
                     SBO_Application.StatusBar.SetText("No order selected. Please select at least one order to create it's delivery.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                     Exit Sub
+                Else
+                    LoadOrdersDataInGrid()
                 End If
-                LoadOrdersDataInGrid()
             Catch ex As Exception
                 SBO_Application.StatusBar.SetText($"{ex.Message}")
             End Try
@@ -454,18 +433,27 @@ Public Class SEI_OrdersMonitor
             Try
                 Dim grid As SAPbouiCOM.Grid = Me.Form.Items.Item(FormControls.grid).Specific
                 Dim isOrderSelected As Boolean = False
-                Dim docEntries As New List(Of Integer)
+                Dim selectedOrders As New List(Of Order)
                 For i As Integer = 0 To grid.Rows.Count - 1
 
                     Dim sendChecked As String = grid.DataTable.GetValue("Send", i)
-                    Dim docEntry As Integer = grid.DataTable.GetValue("DocEntry", i)
                     Dim orderStatus As Integer = grid.DataTable.GetValue("OrderStatus", i)
 
-                    docEntries.Add(docEntry)
-
                     If sendChecked = "Y" And orderStatus = "Delivered" Then
+
+                        Dim docEntry As Integer = grid.DataTable.GetValue("DocEntry", i)
+                        Dim cardCode As String = grid.DataTable.GetValue("CardCode", i).ToString()
+                        Dim DeliveryDocEntry As Integer = grid.DataTable.GetValue("Delivery", i)
+
+                        Dim order As New Order With {
+                            .DocEntry = docEntry,
+                            .CardCode = cardCode,
+                            .TrgetEntry = DeliveryDocEntry
+                        }
+
+                        selectedOrders.Add(order)
                         isOrderSelected = True
-                        PatchStatus(docEntry, "Invoiced").Wait()
+
                     ElseIf sendChecked = "Y" And orderStatus <> "Delivered" Then
                         SBO_Application.StatusBar.SetText("You cannot create an invoice, there is no delivery created.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                     End If
@@ -473,16 +461,18 @@ Public Class SEI_OrdersMonitor
                 If Not isOrderSelected Then
                     SBO_Application.StatusBar.SetText("No order selected. Please select at least one order to create it's invoice.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                     Exit Sub
+                Else
+                    PostInvoice(selectedOrders).Wait()
+                    LoadOrdersDataInGrid()
                 End If
 
-                PostInvoice(docEntries).Wait()
-                LoadOrdersDataInGrid()
             Catch ex As Exception
                 SBO_Application.StatusBar.SetText($"{ex.Message}")
             End Try
 
         End If
     End Sub
+
 
 #End Region
 
@@ -562,7 +552,7 @@ Public Class SEI_OrdersMonitor
             End If
 
             Try
-                Await m_SBOAddon.oSLConnection.Request("Orders").PostAsync(delivery)
+                Await m_SBOAddon.oSLConnection.Request("DeliveryNotes").PostAsync(delivery)
 
                 response.IsSuccess = True
                 response.Message = "Delivery created successfully"
@@ -583,70 +573,69 @@ Public Class SEI_OrdersMonitor
         End Try
     End Function
 
-    Private Async Function PostInvoice(docEntries As List(Of Integer)) As Task
-        Try
-            If docEntries Is Nothing OrElse docEntries.Count = 0 Then
-                SBO_Application.StatusBar.SetText("No orders selected to create invoices.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                Return
-            End If
+    Private Async Function PostInvoice(orders As List(Of Order)) As Task
+        'Try
 
-            Dim successCount As Integer = 0
-            Dim errorCount As Integer = 0
+        '    Dim successCount As Integer = 0
+        '    Dim errorCount As Integer = 0
 
-            For Each docEntry As Integer In docEntries
-                Try
-                    Dim order As Order = GetOrder(docEntry)
-                    If order Is Nothing Then
-                        SBO_Application.StatusBar.SetText($"Error: Could not retrieve order {docEntry}.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                        errorCount += 1
-                        Continue For
-                    End If
+        '    Dim groupedOrders = orders.GroupBy((Function(o) o.CardCode))
+        '    For Each group In groupedOrders
+        '        Dim deliveries As New List(Of Delivery)
+        '        Try
+        '            Dim cardCode = group.Key
+        '            Dim salesOrders = group.ToList()
+        '            For Each salesOrder In salesOrders
+        '                Dim delivery As Delivery = GetDelivery(salesOrder.TrgetEntry)
+        '                If delivery IsNot Nothing Then
+        '                    deliveries.Add(delivery)
+        '                End If
 
-                    Dim invoice As New With {
-                    .CardCode = order.CardCode,
-                    .DocDate = DateTime.Now.ToString("yyyy-MM-dd"),
-                    .DocDueDate = DateTime.Now.AddDays(30).ToString("yyyy-MM-dd"),
-                    .Comments = $"Invoice created from order #{docEntry}",
-                    .DocumentLines = New List(Of Object)()
-                }
+        '            Next
 
-                    For Each line In order.DocumentLines
-                        Dim invoiceLine As New With {
-                        .BaseEntry = docEntry,
-                        .BaseLine = line.LineNum,
-                        .BaseType = 17,
-                        .Quantity = line.Quantity
-                    }
-                        invoice.DocumentLines.Add(invoiceLine)
-                    Next
+        '            Dim invoice As New With {
+        '            .CardCode = cardCode,
+        '            .DocDate = DateTime.Now.ToString("yyyy-MM-dd"),
+        '            .DocDueDate = DateTime.Now.AddDays(30).ToString("yyyy-MM-dd"),
+        '            .Comments = $"Invoice created from deliveries",
+        '            .DocumentLines = New List(Of Object)()
+        '        }
+        '            For Each delivery In deliveries
+        '                For Each line In delivery.DocumentLines
+        '                    Dim invoiceLine = New With {
+        '                    .BaseEntry = delivery.DocEntry,
+        '                    .BaseLine = line.LineNum,
+        '                    .BaseType = 15 ' Delivery = 15
+        '                }
+        '                    invoice.DocumentLines.Add(invoiceLine)
+        '                Next
+        '            Next
 
-                    Await m_SBOAddon.oSLConnection.Request("Invoices").PostAsync(invoice) '.GetAwaiter().GetResult() 
-                    'Marti: si el getawaiter getresult funciona i podem veure el resultat, 
-                    'a continuacio avans del patch statues podem fer un if .IsSucceded o algu així per assegurar que
-                    'només es fa el patch si ha anat bé, però avans shad e provar si funcionar a PostInvoice
 
-                    Await PatchStatus(docEntry, "Invoiced")
+        '            Await m_SBOAddon.oSLConnection.Request("Invoices").PostAsync(invoice)
 
-                    SBO_Application.StatusBar.SetText($"Invoice for order #{docEntry} created successfully.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
-                    successCount += 1
+        '            Await PatchStatus(docEntry, "Invoiced")
 
-                Catch ex As Exception
-                    SBO_Application.StatusBar.SetText($"Error creating invoice for order #{docEntry}: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                    errorCount += 1
-                End Try
-            Next
+        '            SBO_Application.StatusBar.SetText($"Invoice for order #{docEntry} created successfully.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
+        '            successCount += 1
 
-            If successCount > 0 AndAlso errorCount = 0 Then
-                SBO_Application.StatusBar.SetText($"All invoices ({successCount}) created successfully.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
-            ElseIf successCount > 0 AndAlso errorCount > 0 Then
-                SBO_Application.StatusBar.SetText($"Created {successCount} invoices with {errorCount} errors.", BoMessageTime.bmt_Medium, BoStatusBarMessageType.smt_Warning)
-            ElseIf successCount = 0 AndAlso errorCount > 0 Then
-                SBO_Application.StatusBar.SetText($"Failed to create any invoices. {errorCount} errors occurred.", BoMessageTime.bmt_Medium, BoStatusBarMessageType.smt_Error)
-            End If
+        '        Catch ex As Exception
+        '            SBO_Application.StatusBar.SetText($"Error creating invoice for order #{docEntry}: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+        '            errorCount += 1
+        '        End Try
+        '    Next
 
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText($"Error in PostInvoice: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-        End Try
+        '    If successCount > 0 AndAlso errorCount = 0 Then
+        '        SBO_Application.StatusBar.SetText($"All invoices ({successCount}) created successfully.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
+        '    ElseIf successCount > 0 AndAlso errorCount > 0 Then
+        '        SBO_Application.StatusBar.SetText($"Created {successCount} invoices with {errorCount} errors.", BoMessageTime.bmt_Medium, BoStatusBarMessageType.smt_Warning)
+        '    ElseIf successCount = 0 AndAlso errorCount > 0 Then
+        '        SBO_Application.StatusBar.SetText($"Failed to create any invoices. {errorCount} errors occurred.", BoMessageTime.bmt_Medium, BoStatusBarMessageType.smt_Error)
+        '    End If
+
+        'Catch ex As Exception
+        '    SBO_Application.StatusBar.SetText($"Error in PostInvoice: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+        'End Try
     End Function
 
     Private Async Function PatchStatus(DocEntry As Integer, OrderStatus As String) As Task
@@ -670,212 +659,138 @@ Public Class SEI_OrdersMonitor
             Dim oDataTable As SAPbouiCOM.DataTable = Me.Form.DataSources.DataTables.Item(FormControls.DataTable)
 
 
-            'Dim query As String = $"SELECT '' AS Send, T0.DocEntry,T0.DocNum as Document,T0.DocTotal AS DocTotal,T1.SlpName AS SalesEmployee,T0.DocDate As Date,T0.DocDueDate AS DueDate,T0.CardCode AS Client,T0.CardName AS ClientName,T2.DocEntry AS Invoice,T0.U_OrdersStatus AS OrderStatus,T4.U_Status AS OperatorStatus,
-            '                        CASE 
-            '                            WHEN T2.DocEntry IN (
-            '                                SELECT TOP 15 T2.DocEntry FROM ORDR T0
-            '	JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-            '	JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-            '	GROUP by T2.DocEntry,T2.DocDate  ORDER BY T2.DocDate DESC
-            '                            ) THEN 'Y' ELSE 'N'
-            '                        END AS IsLastFifteenInvoices
-            '                        FROM ORDR T0
-            '                        INNER JOIN OSLP T1 on T0.SlpCode = T1.SlpCode
-            '                        LEFT JOIN INV1 T3 on T0.DocEntry = T3.BaseEntry
-            '                        LEFT JOIN OINV T2 on T3.DocEntry = T2.DocEntry
-            '                        LEFT JOIN [@CONF_ORDERS] T4 on T0.DocEntry = T4.U_DocEntry
-            '                        GROUP BY T0.DocEntry,T0.DocNum ,T0.DocTotal ,T1.SlpName ,T0.DocDate ,T0.DocDueDate,T0.CardCode,T0.CardName,T2.DocEntry,T0.U_OrdersStatus ,T4.U_Status  Order by T0.DocEntry"
-
             Dim query As String = $"SELECT * FROM (
-                                    SELECT 
-                                        '' AS Send,
-                                        SQ.DocEntry,
-                                        SQ.DocNum AS Document,
-                                        SQ.DocTotal AS DocTotal,
-                                        SQ.SlpName AS SalesEmployee,
-                                        SQ.DocDate AS Date,
-                                        SQ.DocDueDate AS DueDate,
-                                        SQ.CardCode AS Client,
-                                        SQ.CardName AS ClientName,
-                                        SQ.Invoice AS Invoice,
-                                        SQ.OrderStatus AS OrderStatus,
-                                        SQ.OperatorStatus AS OperatorStatus,
-                                        'Last 15 invoices' AS Status
-                                    FROM (
-                                        SELECT TOP 15 
-                                            T0.DocEntry,
-                                            T0.DocNum,
-                                            T0.DocTotal,
-                                            T1.SlpName,
-                                            T0.DocDate,
-                                            T0.DocDueDate,
-                                            T0.CardCode,
-                                            T0.CardName,
-                                            T2.DocEntry AS Invoice,
-                                            T0.U_OrdersStatus AS OrderStatus,
-                                            T4.U_Status AS OperatorStatus,
-                                            T2.DocDate AS InvoiceDocDate 
-                                        FROM ORDR T0
-                                        INNER JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                        INNER JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                        INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                        GROUP BY 
-                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                            T2.DocEntry, T0.U_OrdersStatus, T4.U_Status, T2.DocDate
-                                        ORDER BY T2.DocDate DESC
-                                    ) AS SQ
+                                                    SELECT 
+                                                        '' AS Send,
+                                                        SQ.DocEntry,
+                                                        SQ.DocNum AS Document,
+                                                        SQ.DocTotal AS DocTotal,
+                                                        SQ.SlpName AS SalesEmployee,
+                                                        SQ.DocDate AS DocumentDate,
+                                                        SQ.DocDueDate AS DueDate,
+										                SQ.Invoice,
+										                SQ.InvoiceDocNum,
+										                SQ.Delivery,
+										                SQ.DeliveryDocNum,
+                                                        SQ.CardCode AS Client,
+                                                        SQ.CardName AS ClientName,
+                                                        SQ.OrderStatus AS OrderStatus,
+                                                        SQ.OperatorStatus AS OperatorStatus,
+                                                        'Last 15 invoices' AS Status
+                                                    FROM (
+                                                        SELECT TOP 15 
+                                                            T0.DocEntry,
+                                                            T0.DocNum,
+                                                            T0.DocTotal,
+                                                            T1.SlpName,
+                                                            T0.DocDate,
+                                                            T0.DocDueDate,
+                                                            T0.CardCode,
+                                                            T0.CardName,
+                                                            T2.DocEntry AS Invoice,
+											                T2.DocNum AS InvoiceDocNum,
+											                D.DocEntry AS Delivery,
+											                D.DocNum AS DeliveryDocNum,
+                                                            T0.U_OrdersStatus AS OrderStatus,
+                                                            T4.U_Status AS OperatorStatus,
+                                                            T2.DocDate AS InvoiceDocDate 
+                                                        FROM ORDR T0
+										                INNER JOIN RDR1 R ON T0.DocEntry = R.DocEntry
+										                LEFT JOIN DLN1 D1 ON R.DocEntry = D1.BaseEntry AND R.LineNum = D1.BaseLine AND D1.BaseType = 17  
+										                INNER JOIN ODLN D ON D1.DocEntry = D.DocEntry
+										                LEFT JOIN INV1 T3 ON D.DocEntry = T3.BaseEntry AND D1.LineNum = T3.BaseLine AND T3.BaseType = 15  
+										                INNER JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
+                                                        LEFT JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
+                                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
+                                                        GROUP BY 
+                                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
+                                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
+                                                            T2.DocEntry,T2.DocNum,D.DocEntry,
+											                D.DocNum, T0.U_OrdersStatus, T4.U_Status, T2.DocDate
+                                                        ORDER BY T2.DocDate DESC
+                                                    ) AS SQ
 
-                                        UNION 
+                                                    UNION ALL
 
-                                        SELECT 
-                                            '' AS Send,
-                                            T0.DocEntry,
-                                            T0.DocNum AS Document,
-                                            T0.DocTotal AS DocTotal,
-                                            T1.SlpName AS SalesEmployee,
-                                            T0.DocDate AS Date,
-                                            T0.DocDueDate AS DueDate,
-                                            T0.CardCode AS Client,
-                                            T0.CardName AS ClientName,
-                                            T2.DocEntry AS Invoice,
-                                            T0.U_OrdersStatus AS OrderStatus,
-                                            T4.U_Status AS OperatorStatus,
-                                            'Sent' AS Status
-                                        FROM ORDR T0
-                                        LEFT JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                        LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                        INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                        WHERE T0.U_OrdersStatus = 'Sent'
-                                        GROUP BY 
-                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                            T2.DocEntry, T0.U_OrdersStatus, T4.U_Status
+									                SELECT 
+										                '' AS Send,
+										                T0.DocEntry,
+										                T0.DocNum AS Document,
+										                T0.DocTotal AS DocTotal,
+										                T1.SlpName AS SalesEmployee,
+										                T0.DocDate AS DocumentDate,
+										                T0.DocDueDate AS DueDate,
+										                ISNULL(T2.DocEntry, 0) AS Invoice,
+										                ISNULL(T2.DocNum, 0) AS InvoiceDocNum,
+										                ISNULL(D.DocEntry, 0) AS Delivery,
+										                ISNULL(D.DocNum, 0) AS DeliveryDocNum,
+										                T0.CardCode AS Client,
+										                T0.CardName AS ClientName,
+										                T0.U_OrdersStatus AS OrderStatus,
+										                T4.U_Status AS OperatorStatus,
+										                CASE
+											                WHEN T0.U_OrdersStatus = 'Sent' THEN 'Sent'
+											                WHEN T2.DocEntry IS NOT NULL THEN 'Invoiced'
+											                WHEN D.DocEntry IS NOT NULL THEN 'Delivered'
+											                WHEN T4.U_Status = 'Error' THEN 'Error'
+											                WHEN T4.U_Status = 'Confirmed' THEN 'Confirmed'
+										                END AS Status
+									                FROM ORDR T0
+									                INNER JOIN RDR1 R ON T0.DocEntry = R.DocEntry
+									                LEFT JOIN DLN1 D1 ON R.DocEntry = D1.BaseEntry AND R.LineNum = D1.BaseLine AND D1.BaseType = 17  
+									                LEFT JOIN ODLN D ON D1.DocEntry = D.DocEntry
+									                LEFT JOIN INV1 T3 ON D.DocEntry = T3.BaseEntry AND D1.LineNum = T3.BaseLine AND T3.BaseType = 15  
+									                LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
+									                LEFT JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
+									                LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
+									                WHERE (T0.U_OrdersStatus = 'Sent'
+										                    OR T2.DocEntry IS NOT NULL 
+											                OR D.DocEntry IS NOT NULL
+											                OR T4.U_Status IN ('Error', 'Confirmed'))
+											                AND T0.DocEntry NOT IN (
+												                SELECT TOP 15 T0.DocEntry
+												                FROM ORDR T0
+												                INNER JOIN RDR1 R ON T0.DocEntry = R.DocEntry
+												                LEFT JOIN DLN1 D1 ON R.DocEntry = D1.BaseEntry AND R.LineNum = D1.BaseLine AND D1.BaseType = 17  
+												                INNER JOIN ODLN D ON D1.DocEntry = D.DocEntry
+												                LEFT JOIN INV1 T3 ON D.DocEntry = T3.BaseEntry AND D1.LineNum = T3.BaseLine AND T3.BaseType = 15  
+												                INNER JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
+												                GROUP BY T0.DocEntry, T2.DocDate
+												                ORDER BY T2.DocDate DESC
+									                )
+									                GROUP BY 
+										                T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
+										                T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
+										                T2.DocEntry,T2.DocNum,D.DocEntry,
+										                D.DocNum, T0.U_OrdersStatus, T4.U_Status
 
-                                        UNION
+                                                    UNION ALL
 
-                                        SELECT 
-                                            '' AS Send,
-                                            T0.DocEntry,
-                                            T0.DocNum AS Document,
-                                            T0.DocTotal AS DocTotal,
-                                            T1.SlpName AS SalesEmployee,
-                                            T0.DocDate AS Date,
-                                            T0.DocDueDate AS DueDate,
-                                            T0.CardCode AS Client,
-                                            T0.CardName AS ClientName,
-                                            T2.DocEntry AS Invoice,
-                                            T0.U_OrdersStatus AS OrderStatus,
-                                            T4.U_Status AS OperatorStatus,
-                                            'Error' AS Status
-                                        FROM ORDR T0
-                                        LEFT JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                        LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                        INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                        WHERE T4.U_Status = 'Error'
-                                        GROUP BY 
-                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                            T2.DocEntry, T0.U_OrdersStatus, T4.U_Status
-
-                                        UNION
-
-                                        SELECT 
-                                            '' AS Send,
-                                            T0.DocEntry,
-                                            T0.DocNum AS Document,
-                                            T0.DocTotal AS DocTotal,
-                                            T1.SlpName AS SalesEmployee,
-                                            T0.DocDate AS Date,
-                                            T0.DocDueDate AS DueDate,
-                                            T0.CardCode AS Client,
-                                            T0.CardName AS ClientName,
-                                            T2.DocEntry AS Invoice,
-                                            T0.U_OrdersStatus AS OrderStatus,
-                                            T4.U_Status AS OperatorStatus,
-                                            'Partially Confirmed' AS Status
-                                        FROM ORDR T0
-                                        LEFT JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                        LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                        INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                        WHERE T4.U_Status = 'Partially Confirmed'
-                                        GROUP BY 
-                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                            T2.DocEntry, T0.U_OrdersStatus, T4.U_Status
-
-                                        UNION
-
-                                        SELECT 
-                                            '' AS Send,
-                                            T0.DocEntry,
-                                            T0.DocNum AS Document,
-                                            T0.DocTotal AS DocTotal,
-                                            T1.SlpName AS SalesEmployee,
-                                            T0.DocDate AS Date,
-                                            T0.DocDueDate AS DueDate,
-                                            T0.CardCode AS Client,
-                                            T0.CardName AS ClientName,
-                                            T2.DocEntry AS Invoice,
-                                            T0.U_OrdersStatus AS OrderStatus,
-                                            T4.U_Status AS OperatorStatus,
-                                            'Confirmed' AS Status
-                                        FROM ORDR T0
-                                        LEFT JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                        LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                        INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                        WHERE T4.U_Status = 'Confirmed'
-                                        GROUP BY 
-                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                            T2.DocEntry, T0.U_OrdersStatus, T4.U_Status
-
-                                        UNION
-
-                                        SELECT 
-                                            '' AS Send,
-                                            T0.DocEntry,
-                                            T0.DocNum AS Document,
-                                            T0.DocTotal AS DocTotal,
-                                            T1.SlpName AS SalesEmployee,
-                                            T0.DocDate AS Date,
-                                            T0.DocDueDate AS DueDate,
-                                            T0.CardCode AS Client,
-                                            T0.CardName AS ClientName,
-                                            T2.DocEntry AS Invoice,
-                                            T0.U_OrdersStatus AS OrderStatus,
-                                            T4.U_Status AS OperatorStatus,
-                                            'Pending' AS Status
-                                        FROM ORDR T0
-                                        LEFT JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                        LEFT JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                        INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                        LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                        WHERE T0.U_OrdersStatus is null 
-                                        AND T0.DocEntry NOT IN ( 
-                                                SELECT TOP 15 
-                                                    T0.DocEntry
-                                                FROM ORDR T0
-                                                INNER JOIN INV1 T3 ON T0.DocEntry = T3.BaseEntry
-                                                INNER JOIN OINV T2 ON T3.DocEntry = T2.DocEntry
-                                                INNER JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
-                                                LEFT JOIN [@CONF_ORDERS] T4 ON T0.DocEntry = T4.U_DocEntry
-                                                GROUP BY 
-                                                    T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                                    T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                                    T2.DocEntry, T0.U_OrdersStatus, T4.U_Status, T2.DocDate
-                                                ORDER BY T2.DocDate DESC
-                                            )
-                                        GROUP BY 
-                                            T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
-                                            T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName, 
-                                            T2.DocEntry, T0.U_OrdersStatus, T4.U_Status) AS AllData 
-                                        ORDER BY AllData.DueDate Asc"
+                                                    SELECT 
+                                                        '' AS Send,
+                                                        T0.DocEntry,
+                                                        T0.DocNum AS Document,
+                                                        T0.DocTotal AS DocTotal,
+                                                        T1.SlpName AS SalesEmployee,
+                                                        T0.DocDate AS DocumentDate,
+                                                        T0.DocDueDate AS DueDate,
+										                0 AS Invoice,
+										                0 AS InvoiceDocNum,
+										                0 AS Delivery,
+										                0 AS DeliveryDocNum,
+                                                        T0.CardCode AS Client,
+                                                        T0.CardName AS ClientName,
+                                                        NULL AS OrderStatus,
+                                                        NULL AS OperatorStatus, 
+                                                        'Pending' AS Status
+                                                    FROM ORDR T0
+                                                    LEFT JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
+									                INNER JOIN RDR1 R ON T0.DocEntry = R.DocEntry
+                                                    WHERE T0.DocStatus = 'O'
+                                                    GROUP BY 
+                                                        T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
+                                                        T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName) AS AllData 
+                                                    ORDER BY AllData.DueDate Asc"
 
             oDataTable.ExecuteQuery(query)
 
@@ -897,13 +812,52 @@ Public Class SEI_OrdersMonitor
         End Try
     End Sub
 
+    Private Function GetDelivery(docEntry As Integer) As Delivery
+        Try
+            Dim serviceLayer As SLConnection = m_SBOAddon.oSLConnection
+            Dim response = serviceLayer.Request($"DeliveryNotes({docEntry})").GetAsync(Of JObject)().Result()
+
+            If response Is Nothing OrElse response Is Nothing Then
+                Return Nothing
+            End If
+
+            Dim delivery As New Delivery With {
+               .DocEntry = CInt(response("DocEntry")),
+               .CardCode = response("CardCode")?.ToString(),
+               .DocDate = If(response("DocDate") IsNot Nothing,
+                       DateTime.Parse(response("DocDate").ToString()),
+                       DateTime.MinValue),
+               .DocDueDate = If(response("DocDueDate") IsNot Nothing,
+                        DateTime.Parse(response("DocDueDate").ToString()),
+                        DateTime.MinValue),
+               .DocumentLines = New List(Of DeliveryLines)()
+            }
+
+            If response("DocumentLines") IsNot Nothing Then
+                For Each line In response("DocumentLines")
+                    delivery.DocumentLines.Add(New DeliveryLines With {
+                 .lineNum = CInt(line("LineNum")),
+                 .BaseType = line("BaseType"),
+                 .BaseEntry = line("BaseEntry")
+             })
+                Next
+            End If
+
+            Return delivery
+
+        Catch ex As Exception
+            SBO_Application.StatusBar.SetText($"Error fetching delivery {docEntry}: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+            Return Nothing
+        End Try
+
+
+
+
+    End Function
     Private Function GetOrder(docEntry As Integer) As Order
         Try
             Dim serviceLayer As SLConnection = m_SBOAddon.oSLConnection
-            Dim response = serviceLayer.Request($"Orders({docEntry})").GetAsync(Of JObject)().Result() '.GetAwaiter().GetResult() 
-
-            'Marti: Crec que sera el getawiater.getresult ja que hem sembla que tal i com està no retorna resultat
-            'el result no surt de color groc som si no reconegues el metode, si poses getawaiter.getresult si
+            Dim response = serviceLayer.Request($"Orders({docEntry})").GetAsync(Of JObject)().Result()
 
             If response Is Nothing OrElse response Is Nothing Then
                 Return Nothing
@@ -993,21 +947,34 @@ Public Class SEI_OrdersMonitor
                 grid.Columns.Item(uid).Editable = False
             End If
 
-            If (uid = "Invoice") Then
-                grid.Columns.Item(uid).TitleObject.Caption = "Invoice"
-                grid.Columns.Item(uid).Editable = False
-            End If
-
             If (uid = "Date") Then
-                grid.Columns.Item(uid).TitleObject.Caption = "Date"
+                grid.Columns.Item(uid).TitleObject.Caption = "Document Date"
                 grid.Columns.Item(uid).Editable = False
             End If
 
             If (uid = "DueDate") Then
-                grid.Columns.Item(uid).TitleObject.Caption = "Due Date"
+                grid.Columns.Item(uid).TitleObject.Caption = "Expected Delivery Date"
                 grid.Columns.Item(uid).Editable = False
             End If
 
+            If (uid = "Invoice") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Invoice"
+                grid.Columns.Item(uid).LinkedObjectType = SAPbobsCOM.BoObjectTypes.oInvoices
+                grid.Columns.Item(uid).Editable = False
+            End If
+            If (uid = "InvoiceDocNum") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Invoice DocNum"
+                grid.Columns.Item(uid).Editable = False
+            End If
+            If (uid = "Delivery") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Delivery"
+                grid.Columns.Item(uid).LinkedObjectType = SAPbobsCOM.BoObjectTypes.oDeliveryNotes
+                grid.Columns.Item(uid).Editable = False
+            End If
+            If (uid = "DeliveryDocNum") Then
+                grid.Columns.Item(uid).TitleObject.Caption = "Delivery DocNum"
+                grid.Columns.Item(uid).Editable = False
+            End If
             If (uid = "Client") Then
                 grid.Columns.Item(uid).TitleObject.Caption = "Client"
                 grid.Columns.Item(uid).Editable = False
@@ -1033,25 +1000,45 @@ Public Class SEI_OrdersMonitor
             grid.Columns.Item("Status").Visible = False
         End If
 
+
+
         For i = 0 To grid.Rows.Count - 1
             Dim orderStatus As String = grid.DataTable.GetValue("OrderStatus", i)
             Dim operatorStatus As String = grid.DataTable.GetValue("OperatorStatus", i)
             Dim status As String = grid.DataTable.GetValue("Status", i)
+            Dim dueDateObj As Object = grid.DataTable.GetValue("DueDate", i)
 
             If status = "Sent" Then
                 grid.CommonSetting.SetRowBackColor(i + 1, RGB(255, 255, 0)) 'YELLOW
-            ElseIf status = "Partially Confirmed" Then
-                grid.CommonSetting.SetRowBackColor(i + 1, RGB(255, 165, 0)) 'ORANGE
             ElseIf status = "Error" Then
                 grid.CommonSetting.SetRowBackColor(i + 1, RGB(139, 0, 0)) 'RED
             ElseIf status = "Confirmed" Then
-                grid.CommonSetting.SetRowBackColor(i + 1, RGB(57, 255, 20)) 'GREEN
+                grid.CommonSetting.SetRowBackColor(i + 1, RGB(144, 238, 144)) 'LIGHT GREEN
+            ElseIf status = "Delivered" Then
+                grid.CommonSetting.SetRowBackColor(i + 1, RGB(60, 179, 113)) 'GREEN
+            ElseIf status = "Invoiced" Then
+                grid.CommonSetting.SetRowBackColor(i + 1, RGB(0, 128, 0)) 'DARK GREEN
             ElseIf status = "Last 15 invoices" Then
-                grid.CommonSetting.SetRowBackColor(i + 1, RGB(173, 216, 230)) ' blue
-            Else
-                grid.CommonSetting.SetRowBackColor(i + 1, -1)
+                grid.CommonSetting.SetRowBackColor(i + 1, RGB(173, 216, 230)) ' LIGHT BLUE
+            ElseIf status = "Pending" Then
+
+                Dim dueDate As DateTime
+                Dim isDueDateValid As Boolean = DateTime.TryParse(dueDateObj.ToString(), dueDate)
+
+                If isDueDateValid Then
+                    Dim timeUntilDue As TimeSpan = dueDate - DateTime.Now
+                    If timeUntilDue.TotalHours <= 48 AndAlso timeUntilDue.TotalSeconds >= 0 Then
+                        grid.CommonSetting.SetRowBackColor(i + 1, RGB(255, 165, 0))   ' ORANGE
+                    ElseIf timeUntilDue.TotalSeconds < 0 Then
+                        grid.CommonSetting.SetRowBackColor(i + 1, RGB(169, 169, 169))  'DARK GRAY
+                    Else
+                        grid.CommonSetting.SetRowBackColor(i + 1, -1)
+                    End If
+                End If
             End If
         Next
+
+
 
         grid.DataTable.LoadSerializedXML(SAPbouiCOM.BoDataTableXmlSelect.dxs_DataOnly, xmlDoc.ToString())
         grid.AutoResizeColumns()
