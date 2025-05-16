@@ -185,43 +185,39 @@ Public Class SEI_OrdersMonitor
             Try
                 Dim grid As SAPbouiCOM.Grid = Me.Form.Items.Item(FormControls.grid).Specific
                 Dim isOrderSelected As Boolean = False
-                For i As Integer = 0 To grid.Rows.Count - 1
+                Dim selectedOrders As New List(Of Order)
 
+                For i As Integer = 0 To grid.Rows.Count - 1
                     Dim sendChecked As String = grid.DataTable.GetValue("Send", i)
-                    Dim docEntry As Integer = grid.DataTable.GetValue("DocEntry", i)
-                    Dim operatorStatus As Integer = grid.DataTable.GetValue("OperatorStatus", i)
+                    Dim operatorStatus As String = grid.DataTable.GetValue("OperatorStatus", i)
 
                     If sendChecked = "Y" And operatorStatus = "C" Then
-                        isOrderSelected = True
-                        Dim delivery = CreateDeliveryObject(docEntry)
-                        PostDelivery(delivery).Wait()
-                        'Do post delivery. Fer el post de totes les deliveries marcades com a chek si                   
-                        'Si ha anat be PatchStatus tal i com esta, sino cridem la funcio pero
-                        'posatn no deliverered error delivering
-                        Dim response = New DeliveryResponse()
+                        Dim docEntry As Integer = grid.DataTable.GetValue("DocEntry", i)
+                        Dim cardCode As String = grid.DataTable.GetValue("Client", i).ToString()
 
-                        If response.IsSuccess Then
-                            PatchStatus(docEntry, "Delivered").Wait()
-                        Else
-                            PatchStatus(docEntry, "Error delivering").Wait()
-                        End If
+                        Dim order As New Order With {
+                            .DocEntry = docEntry,
+                            .CardCode = cardCode
+                        }
+
+                        selectedOrders.Add(order)
+                        isOrderSelected = True
 
                     ElseIf sendChecked = "Y" And operatorStatus <> "C" Then
                         SBO_Application.StatusBar.SetText("You cannot create a delivery, the order is not confirmed.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                     End If
-
                 Next
 
                 If Not isOrderSelected Then
-                    SBO_Application.StatusBar.SetText("No order selected. Please select at least one order to create it's delivery.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                    SBO_Application.StatusBar.SetText("No order selected. Please select at least one order to create its delivery.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                     Exit Sub
                 Else
+                    PostDelivery(selectedOrders).Wait()
                     LoadOrdersDataInGridWithFiltration()
                 End If
             Catch ex As Exception
-                SBO_Application.StatusBar.SetText($"{ex.Message}")
+                SBO_Application.StatusBar.SetText($"Error creating deliveries: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
             End Try
-
         End If
     End Sub
     Private Sub HandleBtnCreateInvoices(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
@@ -275,53 +271,53 @@ Public Class SEI_OrdersMonitor
 
 #Region "FUINCIONES GENERALES"
 
-    Private Function CreateDeliveryObject(docEntry As Integer) As Delivery
-        Try
-            Dim response = Task.Run(Function() m_SBOAddon.oSLConnection.Request("CONF_ORDERS").Filter($"DocEntry eq {docEntry}").GetAsync(Of JObject)()).GetAwaiter().GetResult()
-            If response Is Nothing Then
-                Throw New Exception($"Order with DocEntry {docEntry} not found in CONF_ORDERS")
-            End If
+    'Private Function CreateDeliveryObject(docEntry As Integer) As Delivery
+    '    Try
+    '        Dim response = Task.Run(Function() m_SBOAddon.oSLConnection.Request("CONFORDERS").Filter($"DocEntry eq {docEntry}").GetAsync(Of JArray)()).GetAwaiter().GetResult()
+    '        If response Is Nothing Then
+    '            Throw New Exception($"Order with DocEntry {docEntry} not found in CONFORDERS")
+    '        End If
 
-            Dim delivery As New Delivery()
-            delivery.DocEntry = CInt(response("DocEntry"))
-            delivery.CardCode = Task.Run(Function() GetOrderCardCode(CInt(response("DocNum")))).GetAwaiter().GetResult()
-            delivery.DocDate = DateTime.Now.ToString("yyyy-MM-dd")
-            delivery.DocDueDate = DateTime.Now.ToString("yyyy-MM-dd")
-            delivery.Comments = $"Delivery created from confirmed order #{response("DocNum")}"
-            delivery.WarehouseCode = "01"
+    '        Dim delivery As New Delivery()
+    '        delivery.DocEntry = CInt(response("DocEntry"))
+    '        delivery.CardCode = Task.Run(Function() GetOrderCardCode(CInt(response("DocNum")))).GetAwaiter().GetResult()
+    '        delivery.DocDate = DateTime.Now.ToString("yyyy-MM-dd")
+    '        delivery.DocDueDate = DateTime.Now.ToString("yyyy-MM-dd")
+    '        delivery.Comments = $"Delivery created from confirmed order #{response("DocNum")}"
+    '        delivery.WarehouseCode = "01"
 
-            Dim linesResponse = Task.Run(Function() m_SBOAddon.oSLConnection.Request("CONF_ORDERLINES").Filter($"DocEntry eq {docEntry}").GetAllAsync(Of JObject)()).GetAwaiter().GetResult()
-            If linesResponse Is Nothing OrElse linesResponse.Count = 0 Then
-                Throw New Exception($"No lines found for order {docEntry} in CONF_ORDERLINES")
-            End If
+    '        Dim linesResponse = Task.Run(Function() m_SBOAddon.oSLConnection.Request("CONF_ORDERLINES").Filter($"DocEntry eq {docEntry}").GetAllAsync(Of JObject)()).GetAwaiter().GetResult()
+    '        If linesResponse Is Nothing OrElse linesResponse.Count = 0 Then
+    '            Throw New Exception($"No lines found for order {docEntry} in CONF_ORDERLINES")
+    '        End If
 
-            For Each lineData As JObject In linesResponse
-                If lineData("LineStatus").ToString() = "C" Then
-                    Dim line As New DeliveryLines()
-                    line.BaseEntry = CInt(response("DocNum"))
-                    line.BaseLine = CInt(lineData("LineNum"))
-                    line.ItemCode = lineData("ItemCode").ToString()
-                    line.Quantity = CDbl(lineData("Quantity"))
-                    If Not String.IsNullOrEmpty(lineData("LotNumber")?.ToString()) Then
-                        Dim batch As New BatchNumber()
-                        batch.BatchNumber = lineData("LotNumber").ToString()
-                        batch.Quantity = CDbl(lineData("Quantity"))
-                        line.BatchNumbers.Add(batch)
-                    End If
-                    delivery.DocumentLines.Add(line)
-                End If
-            Next
+    '        For Each lineData As JObject In linesResponse
+    '            If lineData("LineStatus").ToString() = "C" Then
+    '                Dim line As New DeliveryLines()
+    '                line.BaseEntry = CInt(response("DocNum"))
+    '                line.BaseLine = CInt(lineData("LineNum"))
+    '                line.ItemCode = lineData("ItemCode").ToString()
+    '                line.Quantity = CDbl(lineData("Quantity"))
+    '                If Not String.IsNullOrEmpty(lineData("LotNumber")?.ToString()) Then
+    '                    Dim batch As New BatchNumber()
+    '                    batch.BatchNumber = lineData("LotNumber").ToString()
+    '                    batch.Quantity = CDbl(lineData("Quantity"))
+    '                    line.BatchNumbers.Add(batch)
+    '                End If
+    '                delivery.DocumentLines.Add(line)
+    '            End If
+    '        Next
 
-            If delivery.DocumentLines.Count = 0 Then
-                Throw New Exception("No confirmed lines were found for delivery creation")
-            End If
+    '        If delivery.DocumentLines.Count = 0 Then
+    '            Throw New Exception("No confirmed lines were found for delivery creation")
+    '        End If
 
-            Return delivery
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText($"Error creating delivery object from UDO: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-            Return Nothing
-        End Try
-    End Function
+    '        Return delivery
+    '    Catch ex As Exception
+    '        SBO_Application.StatusBar.SetText($"Error creating delivery object from UDO: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+    '        Return Nothing
+    '    End Try
+    'End Function
 
     Private Async Function GetOrderCardCode(docNum As Integer) As Task(Of String)
         Try
@@ -338,37 +334,69 @@ Public Class SEI_OrdersMonitor
         End Try
     End Function
 
-    Private Async Function PostDelivery(delivery As Delivery) As Task(Of DeliveryResponse)
-        Dim response As New DeliveryResponse()
-
+    Private Async Function PostDelivery(orders As List(Of Order)) As Task
         Try
-            If delivery Is Nothing Then
-                response.IsSuccess = False
-                response.Message = "Delivery object is null"
-                Return response
-            End If
+            For Each orderBasic In orders
+                Try
+                    Dim completeOrder As Order = GetOrder(orderBasic.DocEntry)
 
-            Try
-                Await m_SBOAddon.oSLConnection.Request("DeliveryNotes").PostAsync(delivery)
+                    If completeOrder Is Nothing OrElse completeOrder.DocumentLines Is Nothing OrElse completeOrder.DocumentLines.Count = 0 Then
+                        Throw New Exception($"No se pudo recuperar el pedido completo o no tiene líneas")
+                    End If
 
-                response.IsSuccess = True
-                response.Message = "Delivery created successfully"
-                SBO_Application.StatusBar.SetText($"Delivery for order #{delivery.DocEntry} created successfully.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
-            Catch slEx As Exception
-                response.IsSuccess = False
-                response.Message = $"Error creating delivery: {slEx.Message}"
-                SBO_Application.StatusBar.SetText(response.Message, BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-            End Try
+                    Dim delivery As New With {
+                    .CardCode = completeOrder.CardCode,
+                    .DocDate = DateTime.Now.ToString("yyyy-MM-dd"),
+                    .DocDueDate = DateTime.Now.AddDays(30).ToString("yyyy-MM-dd"),
+                    .Comments = $"Delivery created from order #{completeOrder.DocEntry}",
+                    .DocumentLines = New List(Of Object)()
+                }
 
-            Return response
+                    For Each line In completeOrder.DocumentLines
+                        Dim deliveryLine = New With {
+                        .BaseEntry = completeOrder.DocEntry,
+                        .BaseLine = line.LineNum,
+                        .BaseType = 17,
+                        .ItemCode = line.ItemCode,
+                        .Quantity = line.Quantity
+                    }
+                        delivery.DocumentLines.Add(deliveryLine)
+                    Next
 
+                    Await m_SBOAddon.oSLConnection.Request("DeliveryNotes").PostAsync(delivery)
+
+                    Await PatchStatus(completeOrder.DocEntry, "Delivered")
+
+                    SBO_Application.StatusBar.SetText($"Delivery for order #{completeOrder.DocEntry} created successfully.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
+
+                Catch ex As Exception
+                    SBO_Application.StatusBar.SetText($"Error creating delivery for order #{orderBasic.DocEntry}: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                    LogDeliveryError(orderBasic.DocEntry, ex.Message)
+                End Try
+            Next
         Catch ex As Exception
-            response.IsSuccess = False
-            response.Message = "Exception when posting delivery: " & ex.Message
-            SBO_Application.StatusBar.SetText(response.Message, BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-            Return response
+            SBO_Application.StatusBar.SetText($"Error in CreateDeliveriesForOrders: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
         End Try
     End Function
+
+    Private Sub LogDeliveryError(docEntry As Integer, errorMessage As String)
+        Try
+            Dim userTable As SAPbobsCOM.UserTable = CType(SBO_Company.UserTables.Item("LogMonitorOrders"), SAPbobsCOM.UserTable)
+
+            userTable.UserFields.Fields.Item("U_DocEntry").Value = docEntry
+            userTable.UserFields.Fields.Item("U_Error").Value = errorMessage
+
+            Dim result As Integer = userTable.Add()
+            If result <> 0 Then
+                Dim errMsg As String = ""
+                Dim errCode As Integer
+                SBO_Company.GetLastError(errCode, errMsg)
+                SBO_Application.StatusBar.SetText($"Failed to insert log: {errMsg}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+            End If
+        Catch ex As Exception
+            SBO_Application.StatusBar.SetText($"Exception logging error: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+        End Try
+    End Sub
 
     Private Async Function PostInvoice(orders As List(Of Order)) As Task
         Try
@@ -547,8 +575,8 @@ Public Class SEI_OrdersMonitor
 											                WHEN T0.U_OrdersStatus = 'Sent' THEN 'Sent'
 											                WHEN T2.DocEntry IS NOT NULL THEN 'Invoiced'
 											                WHEN D.DocEntry IS NOT NULL THEN 'Delivered'
-											                WHEN T4.U_Status = 'Error' THEN 'Error'
-											                WHEN T4.U_Status = 'Confirmed' THEN 'Confirmed'
+											                WHEN T4.U_Status = 'R' THEN 'Rejected'
+											                WHEN T4.U_Status = 'C' THEN 'Confirmed'
 										                END AS Status
 									                FROM ORDR T0
 									                INNER JOIN RDR1 R ON T0.DocEntry = R.DocEntry
@@ -561,7 +589,7 @@ Public Class SEI_OrdersMonitor
 									                WHERE (T0.U_OrdersStatus = 'Sent'
 										                    OR T2.DocEntry IS NOT NULL 
 											                OR D.DocEntry IS NOT NULL
-											                OR T4.U_Status IN ('Error', 'Confirmed'))
+											                OR T4.U_Status IN ('R', 'C'))
 											                AND T0.DocEntry NOT IN (
 												                SELECT TOP 15 T0.DocEntry
 												                FROM ORDR T0
@@ -755,8 +783,8 @@ Public Class SEI_OrdersMonitor
 											                WHEN T0.U_OrdersStatus = 'Sent' THEN 'Sent'
 											                WHEN T2.DocEntry IS NOT NULL THEN 'Invoiced'
 											                WHEN D.DocEntry IS NOT NULL THEN 'Delivered'
-											                WHEN T4.U_Status = 'Error' THEN 'Error'
-											                WHEN T4.U_Status = 'Confirmed' THEN 'Confirmed'
+											                WHEN T4.U_Status = 'R' THEN 'Rejected'
+											                WHEN T4.U_Status = 'C' THEN 'Confirmed'
 										                END AS Status
 									                FROM ORDR T0
 									                INNER JOIN RDR1 R ON T0.DocEntry = R.DocEntry
@@ -769,7 +797,7 @@ Public Class SEI_OrdersMonitor
 									                WHERE (T0.U_OrdersStatus = 'Sent'
 										                    OR T2.DocEntry IS NOT NULL 
 											                OR D.DocEntry IS NOT NULL
-											                OR T4.U_Status IN ('Error', 'Confirmed'))
+											                OR T4.U_Status IN ('R', 'C'))
 											                AND T0.DocEntry NOT IN (
 												                SELECT TOP 15 T0.DocEntry
 												                FROM ORDR T0

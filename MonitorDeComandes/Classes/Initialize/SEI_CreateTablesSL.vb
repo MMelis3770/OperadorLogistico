@@ -50,8 +50,8 @@ Public Class SEI_CreateTablesSL
             Await CreateUserDataField("@" & tableHeader, "DocDate", "Document Date", BoFieldTypes.db_Date)
             Await CreateUserDataField("@" & tableHeader, "DocDueDate", "Delivery Date", BoFieldTypes.db_Date)
 
-            Dim statusCodes As String() = {"C", "E"}
-            Dim statusNames As String() = {"Confirmed", "Error"}
+            Dim statusCodes As String() = {"C", "R"}
+            Dim statusNames As String() = {"Confirmed", "Rejected"}
             Await CreateUserDataField("@" & tableHeader, "Status", "Status", BoFieldTypes.db_Alpha, 1, codesValidValues:=statusCodes, namesValidValues:=statusNames)
             Await CreateUserDataField("@" & tableHeader, "ErrorMsg", "Error Message", BoFieldTypes.db_Alpha, 254)
 
