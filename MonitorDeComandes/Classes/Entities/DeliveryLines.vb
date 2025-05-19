@@ -5,6 +5,7 @@ Public Class DeliveryLines
     Public Property BaseEntry As Integer
     Public Property BaseLine As Integer
     Public Property ItemCode As String
+    Public Property lineNum As Integer
     Public Property Quantity As Double
     Public Property BatchNumbers As List(Of BatchNumber)
 End Class

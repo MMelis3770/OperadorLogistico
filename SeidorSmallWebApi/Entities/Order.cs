@@ -2,18 +2,22 @@
 {
     public class Order
     {
-        public int id { get; set; }
-        public string client { get; set; }
-        public string orderDate { get; set; }
-        public string dueDate { get; set; }
-        public List<OrderLine> lines { get; set; }
+        public string U_DocEntry { get; set; }
+        public int DocEntry { get; set; }
+        public string U_CardCode { get; set; }
+        public DateTime U_DocDate { get; set; }
+        public DateTime U_DocDueDate { get; set; }
+        public string U_Status { get; set; }
+        public string U_ErrorMsg { get; set; }
+        public List<OrderLine> CONF_ORDERLINESCollection { get; set; }
     }
-
     public class OrderLine
     {
-        public int lineNumber { get; set; }
-        public string itemCode { get; set; }
-        public int quantity { get; set; }
-        public string batch { get; set; }
+        public int DocEntry { get; set; }
+        public int LineId { get; set; }
+        public int U_LineNum { get; set; }
+        public string U_ItemCode { get; set; }
+        public int U_Quantity { get; set; }
+        public string U_Batch { get; set; }
     }
 }
