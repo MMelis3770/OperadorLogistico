@@ -1,9 +1,6 @@
-﻿using BlazorTemplate.Models;
-using BlazorTemplate.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using BlazorTemplate.Interfaces;
+using BlazorTemplate.Models;
+using BlazorTemplate.Processes;
 using static BlazorTemplate.Components.Dialog.BatchAssignmentDialog;
 
 namespace BlazorTemplate.Services
@@ -11,69 +8,39 @@ namespace BlazorTemplate.Services
     public class BatchService : IBatchService
     {
         private readonly ISelectedOrdersService _selectedOrdersService;
-        private List<Batch> _availableBatches;
+        private readonly SQLManagement _sqlManagement;
         private Dictionary<(int OrderId, int LineNumber), List<BatchAssignment>> _batchAssignments;
 
-        public BatchService(ISelectedOrdersService selectedOrdersService)
+        public BatchService(ISelectedOrdersService selectedOrdersService, SQLManagement sqlManagement)
         {
             _selectedOrdersService = selectedOrdersService;
-            _availableBatches = new List<Batch>();
+            _sqlManagement = sqlManagement;
             _batchAssignments = new Dictionary<(int OrderId, int LineNumber), List<BatchAssignment>>();
-
-            // Inicializar datos de ejemplo
-            InitializeTestData();
         }
 
+        // Implementar el método InitializeTestData() aunque no lo usemos
         public void InitializeTestData()
         {
-            // Limpiar datos existentes
-            _availableBatches.Clear();
-            _batchAssignments.Clear();
-
-            // Fecha actual para referencia
-            var today = DateTime.Today;
-
-            // Crear lotes para el producto A00001 (3 lotes)
-            _availableBatches.Add(new Batch("B1001", today.AddDays(-30), today.AddDays(30), "A00001", 100));
-            _availableBatches.Add(new Batch("B1002", today.AddDays(-20), today.AddDays(40), "A00001", 150));
-            _availableBatches.Add(new Batch("B1003", today.AddDays(-10), today.AddDays(50), "A00001", 200));
-
-            // Crear lotes para el producto A00002 (3 lotes)
-            _availableBatches.Add(new Batch("B2001", today.AddDays(-25), today.AddDays(35), "A00002", 120));
-            _availableBatches.Add(new Batch("B2002", today.AddDays(-15), today.AddDays(45), "A00002", 180));
-            _availableBatches.Add(new Batch("B2003", today.AddDays(-5), today.AddDays(55), "A00002", 90));
-
-            // Crear lotes para el producto A00003 (3 lotes)
-            _availableBatches.Add(new Batch("B3001", today.AddDays(-40), today.AddDays(20), "A00003", 80));
-            _availableBatches.Add(new Batch("B3002", today.AddDays(-30), today.AddDays(30), "A00003", 110));
-            _availableBatches.Add(new Batch("B3003", today.AddDays(-20), today.AddDays(40), "A00003", 140));
-
-            // Crear lotes para el producto A00004 (3 lotes)
-            _availableBatches.Add(new Batch("B4001", today.AddDays(-35), today.AddDays(25), "A00004", 90));
-            _availableBatches.Add(new Batch("B4002", today.AddDays(-25), today.AddDays(35), "A00004", 120));
-            _availableBatches.Add(new Batch("B4003", today.AddDays(-15), today.AddDays(45), "A00004", 150));
-
-            // Crear lotes para el producto A00005 (3 lotes)
-            _availableBatches.Add(new Batch("B5001", today.AddDays(-30), today.AddDays(30), "A00005", 100));
-            _availableBatches.Add(new Batch("B5002", today.AddDays(-20), today.AddDays(40), "A00005", 130));
-            _availableBatches.Add(new Batch("B5003", today.AddDays(-10), today.AddDays(50), "A00005", 160));
-
         }
 
         public async Task<List<Batch>> GetAvailableBatchesAsync()
         {
-            // Simular llamada asíncrona
-            await Task.Delay(100);
-            var result = _availableBatches.Where(b => b.IsActive).ToList();
+            // Obtenir tots els batches de la base de dades
+            var batches = await _sqlManagement.GetAllBatchesAsync();
+
+            // Filtrar només els batches actius
+            var result = batches.Where(b => b.IsActive).ToList();
             return result;
         }
 
         public async Task<List<Batch>> GetAvailableBatchesForItemAsync(string itemCode)
         {
-            await Task.Delay(50);
+            // Obtenir batches específics per a un ItemCode des de la base de dades
+            var batches = await _sqlManagement.GetBatchesForItemAsync(itemCode);
 
-            var result = _availableBatches
-                .Where(b => b.ItemCode == itemCode && b.IsActive && b.AvailableQuantity > 0)
+            // Filtrar només els batches actius amb quantitat disponible
+            var result = batches
+                .Where(b => b.IsActive && b.AvailableQuantity > 0)
                 .ToList();
 
             return result;
@@ -81,11 +48,9 @@ namespace BlazorTemplate.Services
 
         public async Task<bool> AssignBatchToOrderLineAsync(int orderId, int lineNumber, string batchId)
         {
-            // Esta función asigna todo el lote de una vez
-            // Para asignaciones parciales, usar SaveBatchAssignmentsForOrderLineAsync
-
-            // Verificar que el batch existe
-            var batch = _availableBatches.FirstOrDefault(b => b.BatchId == batchId);
+            // Verificar que el batch existe en la base de datos
+            var batches = await _sqlManagement.GetBatchesForItemAsync(null); // Obtener todos
+            var batch = batches.FirstOrDefault(b => b.BatchId == batchId);
             if (batch == null)
             {
                 return false;
@@ -228,13 +193,12 @@ namespace BlazorTemplate.Services
             // Solo verificar las cantidades si hay asignaciones
             if (assignments.Any())
             {
-                // Verificar que la suma de las cantidades coincide con la cantidad de la línea
-                int totalAssigned = assignments.Sum(a => a.Quantity);
+                // Verificar que todos los batches existen en la base de datos
+                var allBatches = await GetAvailableBatchesAsync();
 
-                // Verificar que todos los batches existen y tienen suficiente cantidad
                 foreach (var assignment in assignments)
                 {
-                    var batch = _availableBatches.FirstOrDefault(b => b.BatchId == assignment.BatchId);
+                    var batch = allBatches.FirstOrDefault(b => b.BatchId == assignment.BatchId);
                     if (batch == null)
                     {
                         return false;
@@ -299,7 +263,6 @@ namespace BlazorTemplate.Services
 
         public async Task<bool> AllOrderLinesHaveBatchesAsync(int orderId)
         {
-
             var orders = _selectedOrdersService.SelectedOrders;
             var order = orders.FirstOrDefault(o => o.DocEntry == orderId);
             if (order == null)
@@ -321,6 +284,28 @@ namespace BlazorTemplate.Services
             return true;
         }
 
+        public async Task<(bool HasSufficientStock, int AvailableQuantity)> ValidateStockAvailabilityAsync(string itemCode, int requiredQuantity)
+        {
+            try
+            {
+                // Obtenir tots els batches disponibles per a aquest article
+                var batches = await GetAvailableBatchesForItemAsync(itemCode);
+
+                // Calcular la quantitat total disponible
+                int totalAvailable = batches.Sum(b => b.AvailableQuantity);
+
+                // Verificar si hi ha suficient stock
+                bool hasSufficientStock = totalAvailable >= requiredQuantity;
+
+                return (hasSufficientStock, totalAvailable);
+            }
+            catch (Exception)
+            {
+                // En cas d'error, assumim que no hi ha stock suficient
+                return (false, 0);
+            }
+        }
+
         public async Task<bool> AutoAssignBatchesToOrderAsync(int orderId)
         {
             var orders = _selectedOrdersService.SelectedOrders;
@@ -334,7 +319,16 @@ namespace BlazorTemplate.Services
 
             foreach (var line in order.LineItems)
             {
-                // Verificar si ya hay asignaciones
+                var (hasSufficientStock, availableQuantity) = await ValidateStockAvailabilityAsync(line.ItemCode, line.Quantity);
+
+                if (!hasSufficientStock)
+                {
+                    // Si no hi ha suficient stock, marcar com a no assignat i continuar amb la següent línia
+                    allAssigned = false;
+                    continue;
+                }
+
+                // Verificar si ja hay asignaciones
                 var assignments = await GetBatchAssignmentsForOrderLineAsync(orderId, line.LineNum);
                 int totalAssigned = assignments.Sum(a => a.Quantity);
                 int pendingQuantity = line.Quantity - totalAssigned;
@@ -344,7 +338,7 @@ namespace BlazorTemplate.Services
                     continue;
                 }
 
-                // Buscar batches disponibles para este artículo
+                // Buscar batches disponibles para este artículo desde la base de datos
                 var batches = await GetAvailableBatchesForItemAsync(line.ItemCode);
                 if (batches.Any())
                 {

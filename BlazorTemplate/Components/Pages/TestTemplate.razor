@@ -122,6 +122,12 @@
 
         // Limpiar órdenes seleccionadas anteriores al cargar esta página
         _selectedOrdersService.ClearSelectedOrders();
+        ChargeInitialOrders();
+    }
+
+    // Method to charge initial valid orders
+    public async void ChargeInitialOrders(){
+        await LoadOrdersFromSQL();
     }
 
     // Method to check if an order is checked
@@ -159,18 +165,64 @@
             return;
         }
 
-        // Obtener las órdenes completas usando los IDs
-        var selectedOrdersData = processedOrders
-            .Where(o => selectedOrderIds.Contains(o.DocEntry))
-            .ToList();
+        try
+        {
+            // Obtener las OrderData completas desde la base de datos
+            var selectedOrdersData = new List<OrderData>();
 
-        // Guardar en el servicio compartido
-        _selectedOrdersService.SetSelectedOrders(selectedOrdersData);
+            foreach (var orderId in selectedOrderIds)
+            {
+                // Obtener la orden desde la base de datos
+                var order = sqlManagement.GetOrdersFromDatabase().FirstOrDefault(o => o.DocEntry == orderId);
+                if (order != null)
+                {
+                    // Obtener las líneas de la orden
+                    var lineItems = sqlManagement.GetOrderLinesFromDatabase(orderId);
 
-        ValidateOrdersBeforeSQL(selectedOrdersData);
+                    // Crear OrderData usando tu modelo actual
+                    var orderData = new OrderData
+                        {
+                            DocEntry = order.DocEntry,
+                            CardCode = order.CardCode,
+                            OrderDate = order.OrderDate,
+                            DocDueDate = order.DocDueDate,
+                            LineItems = lineItems.Select(li => new LineItem
+                            {
+                                DocEntry = li.DocEntry,
+                                LineNum = li.LineNum,
+                                ItemCode = li.ItemCode,
+                                Quantity = li.Quantity,
+                                Batch = null // El batch será asignado en LayoutBatch
+                            }).ToList()
+                        };
+                    selectedOrdersData.Add(orderData);
+                }
+            }
 
-        // Navegar a la página de Batch
-        _navigationManager.NavigateTo("/LayoutBatch");
+            if (selectedOrdersData.Count == 0)
+            {
+                await _dialogService.ShowErrorAsync("No se pudieron cargar las órdenes seleccionadas", "Error");
+                return;
+            }
+
+            // Debugging: Verificar que se cargaron correctamente
+            Console.WriteLine($"Cargando {selectedOrdersData.Count} órdenes al servicio");
+            foreach (var order in selectedOrdersData)
+            {
+                Console.WriteLine($"Orden {order.DocEntry}: {order.CardCode}, {order.LineItems.Count} líneas");
+            }
+
+            // Guardar en el servicio compartido
+            _selectedOrdersService.SetSelectedOrders(selectedOrdersData);
+
+            // Navegar a la página de Batch
+            _navigationManager.NavigateTo("/LayoutBatch");
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowErrorAsync($"Error al preparar órdenes para batch: {ex.Message}", "Error");
+            Console.WriteLine($"Error completo: {ex}");
+        }
     }
 
     private async void ValidateOrdersBeforeSQL(List<OrderData> selectedOrdersData)
@@ -204,14 +256,14 @@
                 }
 
                 // Validar si hay batches suficientes para los items
-                if (!sqlManagement.GetBatches(line.ItemCode))
-                {
-                    throw new Exception($"Item {line.ItemCode} does not have any available batch");
+                // if (!sqlManagement.GetBatches(line.ItemCode))
+                // {
+                //     throw new Exception($"Item {line.ItemCode} does not have any available batch");
 
-                }
+                // }
             }
         }
-        sqlManagement.LoadOrdersToSQL(ordersToSQL);
+        // sqlManagement.LoadOrdersToSQL(ordersToSQL);
 
     }
 
@@ -228,6 +280,7 @@
             throw new Exception($"Error validating order dates: {ex.Message}", ex);
         }
     }
+
     private async Task LoadOrdersFromFiles()
     {
         if (isLoading) return;
@@ -237,25 +290,46 @@
             isLoading = true;
             StateHasChanged();
 
-            // Usar OrderService para obtener órdenes
+            // Usar OrderService para obtener órdenes desde archivos TXT
             processedOrders = await _orderService.GetOrdersAsync();
 
+            // Validar órdenes antes de cargarlas a SQL
+            ValidateOrdersBeforeSQL(processedOrders);
+
+            // Cargar las órdenes en la base de datos SQL
+            sqlManagement.LoadOrdersToSQL(processedOrders);
+
+            // Obtener las órdenes desde la base de datos SQL
+            await LoadOrdersFromSQL();
+
+            await _dialogService.ShowInfoAsync($"Se han cargado {processedOrders.Count} comandas a la base de datos.", "Información");
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowErrorAsync($"Error al cargar comandas: {ex.Message}", "Error");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadOrdersFromSQL()
+    {
+        try
+        {
+            // Obtener órdenes desde la base de datos
+            var sqlOrders = sqlManagement.GetOrdersFromDatabase();
+
             // Convertir a formato para la grid
-            var orderList = processedOrders.Select(o => new Order(
+            var orderList = sqlOrders.Select(o => new Order(
                 o.DocEntry,
                 o.CardCode,
                 DateOnly.FromDateTime(o.OrderDate),
                 DateOnly.FromDateTime(o.DocDueDate),
-                o.LineItems.Count  // Mostrar número de líneas
+                sqlManagement.GetOrderLinesFromDatabase(o.DocEntry).Count  // Obtener el número real de líneas
             )).ToList();
-
-            // Si hay menos órdenes que el tamaño de página, rellenar con filas vacías
-            int itemsToAdd = Math.Max(0, pagination.ItemsPerPage - orderList.Count);
-            for (int i = 0; i < itemsToAdd; i++)
-            {
-                // Usar IDs negativos para evitar conflictos de clave
-                orderList.Add(new Order(-i - 1, $"Empty-{i + 1}", new DateOnly(), new DateOnly(), 0));
-            }
 
             orders = orderList.AsQueryable();
 
@@ -269,17 +343,10 @@
             // Limpiar la selección actual si existe
             selectedOrder = null;
             selectedOrderItems = null;
-
-            await _dialogService.ShowInfoAsync($"Se han cargado {processedOrders.Count} comandas.", "Información");
         }
         catch (Exception ex)
         {
-            await _dialogService.ShowErrorAsync($"Error al cargar comandas: {ex.Message}", "Error");
-        }
-        finally
-        {
-            isLoading = false;
-            StateHasChanged();
+            throw new Exception($"Error al cargar órdenes desde SQL: {ex.Message}", ex);
         }
     }
 
@@ -290,25 +357,36 @@
         selectedOrder = order;
         StateHasChanged(); // Forzar actualización para mostrar el encabezado de la sección de detalles
 
-        // Busca en las órdenes procesadas
-        var orderData = processedOrders.FirstOrDefault(o => o.DocEntry == selectedOrder.ID);
-
-        if (orderData != null && orderData.LineItems.Any())
+        try
         {
-            // Convertir las líneas al formato para la grid
-            var lineItems = orderData.LineItems
-                .Select(li => new OrderLineItem(
-                    li.LineNum,
-                    li.ItemCode,
-                    li.Quantity
-                ))
-                .ToList();
+            // Obtener las líneas de la orden desde SQL
+            var lineItemsFromDB = sqlManagement.GetOrderLinesFromDatabase(selectedOrder.ID);
 
-            selectedOrderItems = lineItems.AsQueryable();
+            Console.WriteLine($"Líneas recuperadas para orden {selectedOrder.ID}: {lineItemsFromDB.Count}");
+
+            if (lineItemsFromDB != null && lineItemsFromDB.Any())
+            {
+                // Convertir las líneas al formato para la grid
+                var lineItems = lineItemsFromDB
+                    .Select(li => new OrderLineItem(
+                        li.LineNum,
+                        li.ItemCode,
+                        li.Quantity
+                    ))
+                    .ToList();
+
+                selectedOrderItems = lineItems.AsQueryable();
+            }
+            else
+            {
+                // Si no se encuentran líneas, mostrar una colección vacía
+                selectedOrderItems = Array.Empty<OrderLineItem>().AsQueryable();
+            }
         }
-        else
+        catch (Exception ex)
         {
-            // Si no se encuentran líneas, mostrar una colección vacía
+            Console.WriteLine($"Error al obtener líneas para orden {order.ID}: {ex.Message}");
+            // Si ocurre un error, mostrar una colección vacía
             selectedOrderItems = Array.Empty<OrderLineItem>().AsQueryable();
         }
 

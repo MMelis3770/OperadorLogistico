@@ -35,6 +35,7 @@ internal static class Program
                 services.AddFluentUIComponents();
                 services.AddPluginRepositories(context.Configuration);
                 services.AddSingleton<BlazorForm>();
+
                 string orderFilesPath = @"C:\Users\mmelis\OneDrive - SEIDOR SOLUTIONS S.L\Escritorio";
                 services.AddSingleton<IOrderService>(provider =>
                     new OrderService(
@@ -42,10 +43,11 @@ internal static class Program
                         orderFilesPath
                     )
                 );
+
                 // Registrar el servicio de órdenes seleccionadas
                 services.AddSingleton<ISelectedOrdersService, SelectedOrdersService>();
+
                 // Registrar el servicio de batches
-                services.AddSingleton<IBatchService, BatchService>();
                 services.AddSingleton<IBatchService, BatchService>();
                 services.AddSingleton<IDatabaseConnection>(sp =>
                 {

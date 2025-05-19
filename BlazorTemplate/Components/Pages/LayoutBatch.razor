@@ -86,11 +86,23 @@
                 <TemplateColumn Title="Batch">
                     <ChildContent>
                         <div style="display: flex; align-items: center; gap: 4px;">
-                            <button @onclick="@(() => OpenBatchAssignmentDialog(context))"
-                                    style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; display: flex; justify-content: center; align-items: center;"
-                                    title="Editar asignación de lotes">
-                                <FluentIcon Value="@(new Icons.Regular.Size20.Edit())" Color="Color.Accent" />
-                            </button>
+                            @{
+                                var hasStock = HasSufficientStockForLine(context);
+                            }
+
+                            @if (!hasStock)
+                            {
+                                <FluentIcon Value="@(new Icons.Regular.Size16.Warning())" Color="Color.Error" />
+                                <span style="color: red; font-size: 12px;">Stock insuficient</span>
+                            }
+                            else
+                            {
+                                <button @onclick="@(() => OpenBatchAssignmentDialog(context))"
+                                        style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; display: flex; justify-content: center; align-items: center;"
+                                        title="Editar asignación de lotes">
+                                    <FluentIcon Value="@(new Icons.Regular.Size20.Edit())" Color="Color.Accent" />
+                                </button>
+                            }
                         </div>
                     </ChildContent>
                 </TemplateColumn>
@@ -155,6 +167,9 @@
     private int currentLineNumber;
     private string currentItemCode;
     private int currentQuantity;
+    // Diccionari per guardar l'estat del stock de cada línia
+    private Dictionary<(int OrderId, int LineNumber), bool> _stockAvailabilityCache = new Dictionary<(int OrderId, int LineNumber), bool>();
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -211,7 +226,7 @@
         }
     }
 
-    private void HandleRowClick(Order order)
+    private async void HandleRowClick(Order order)
     {
         if (order == null || order.ID <= 0) return;  // Ignorar clics en filas vacías (ID ≤ 0)
 
@@ -223,6 +238,15 @@
 
         if (orderData != null && orderData.LineItems.Any())
         {
+            // NOVA FUNCIONALITAT: Validar stock per a cada línia
+            _stockAvailabilityCache.Clear(); // Netejar cache anterior
+
+            foreach (var line in orderData.LineItems)
+            {
+                var (hasSufficientStock, _) = await _batchService.ValidateStockAvailabilityAsync(line.ItemCode, line.Quantity);
+                _stockAvailabilityCache[(selectedOrder.ID, line.LineNum)] = hasSufficientStock;
+            }
+
             // Convertir las líneas al formato para la grid
             var lineItems = orderData.LineItems
                 .Select(li => new OrderLineItem(
@@ -281,6 +305,22 @@
         StateHasChanged();
     }
 
+    private bool HasSufficientStockForLine(OrderLineItem lineItem)
+    {
+        if (selectedOrder == null) return true;
+
+        var key = (selectedOrder.ID, lineItem.LineNumber);
+
+        // Consultar el cache per veure si aquesta línia té suficient stock
+        if (_stockAvailabilityCache.TryGetValue(key, out bool hasStock))
+        {
+            return hasStock;
+        }
+
+        // Si no està al cache, assumim que sí té stock (per evitar errors)
+        return true;
+    }
+
     private async Task ProcessSelectedOrders()
     {
         if (processedOrders == null || !processedOrders.Any())
@@ -294,7 +334,44 @@
             isLoading = true;
             StateHasChanged();
 
-            // Verificar si todas las órdenes tienen batches asignados
+            // NUEVA VALIDACIÓN: Verificar stock insuficiente ANTES de procesar
+            List<string> ordersWithInsufficientStock = new List<string>();
+
+            foreach (var order in processedOrders)
+            {
+                foreach (var line in order.LineItems)
+                {
+                    var (hasSufficientStock, availableQuantity) = await _batchService.ValidateStockAvailabilityAsync(line.ItemCode, line.Quantity);
+
+                    if (!hasSufficientStock)
+                    {
+                        ordersWithInsufficientStock.Add($"Orden {order.DocEntry}, Línea {line.LineNum + 1}: {line.ItemCode} (Necesario: {line.Quantity}, Disponible: {availableQuantity})");
+                    }
+                }
+            }
+
+            // Si hay stock insuficiente, bloquear el procesamiento
+            if (ordersWithInsufficientStock.Any())
+            {
+                var errorMessage = new StringBuilder();
+                errorMessage.AppendLine("No se puede procesar las comandas porque hay líneas con stock insuficiente:");
+                errorMessage.AppendLine("");
+                foreach (var error in ordersWithInsufficientStock)
+                {
+                    errorMessage.AppendLine("<br>");
+                    errorMessage.AppendLine($"- {error}");
+
+                }
+                errorMessage.AppendLine("");
+
+                await _dialogService.ShowErrorAsync(errorMessage.ToString(), "Stock Insuficiente");
+
+                isLoading = false;
+                StateHasChanged();
+                return; // SALIR SIN PROCESAR
+            }
+
+            // Resto del código existente (verificar batches asignados, etc.)
             List<int> ordersWithMissingBatches = new List<int>();
             foreach (var order in processedOrders)
             {
@@ -310,14 +387,13 @@
             {
                 var message = new StringBuilder();
                 message.AppendLine("Las siguientes comandas tienen productos sin lotes asignados:");
-                message.AppendLine("<br>");
+                message.AppendLine("");
                 foreach (var orderId in ordersWithMissingBatches)
                 {
                     message.AppendLine($"- Comanda {orderId}");
                 }
-
-                message.AppendLine("<br>");
-                message.AppendLine("\n¿Desea continuar y asignar lotes automáticamente?");
+                message.AppendLine("");
+                message.AppendLine("¿Desea continuar y asignar lotes automáticamente?");
 
                 var dialogResult = await _dialogService.ShowConfirmationAsync(
                     message.ToString(),
@@ -341,7 +417,7 @@
             // Mostrar resumen de las órdenes a procesar
             var summary = new StringBuilder();
             summary.AppendLine($"Se procesarán {processedOrders.Count} comandas:");
-            summary.AppendLine("<br>");
+            summary.AppendLine("");
 
             foreach (var order in processedOrders)
             {
@@ -376,10 +452,10 @@
                 }
             }
 
-            // Convertir las órdenes a formato JSON para mostrar y para la API
+            // RESTAURAR EL JSON: Convertir las órdenes a formato JSON para mostrar y para la API
             string jsonOrders = ConvertOrdersToJson(processedOrders);
 
-            // Crear mensaje simple sin HTML
+            // Crear mensaje CON el JSON
             var successMessage = new StringBuilder();
             successMessage.AppendLine($"Se han procesado {processedOrders.Count} comandas con éxito.");
             successMessage.AppendLine("");
@@ -427,14 +503,17 @@
                     lineNumber = li.LineNum + 1,
                     itemCode = li.ItemCode,
                     quantity = li.Quantity,
-                    batch = li.Batch
+                    batch = li.Batch, // Esto incluirá los lotes asignados
+                                      // Opcional: información adicional de lotes
+                    batchDetails = !string.IsNullOrEmpty(li.Batch) ? li.Batch : "Sin lotes asignados"
                 }).ToList()
             }).ToList();
 
             // Serializar a JSON con formato indentado para mejor visualización
             var options = new System.Text.Json.JsonSerializerOptions
                 {
-                    WriteIndented = true
+                    WriteIndented = true,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
                 };
 
             return System.Text.Json.JsonSerializer.Serialize(apiOrders, options);
@@ -447,10 +526,26 @@
     }
 
     // Método para abrir el diálogo de asignación de batch
-    private void OpenBatchAssignmentDialog(OrderLineItem lineItem)
+    private async Task OpenBatchAssignmentDialog(OrderLineItem lineItem)
     {
         if (lineItem == null || selectedOrder == null) return;
 
+        // NOVA VALIDACIÓ: Verificar si hi ha suficient stock disponible
+        var (hasSufficientStock, availableQuantity) = await _batchService.ValidateStockAvailabilityAsync(lineItem.ItemCode, lineItem.Quantity);
+
+        if (!hasSufficientStock)
+        {
+            // Mostrar missatge d'error si no hi ha suficient stock
+            var message = $"No hi ha suficient stock disponible per al article {lineItem.ItemCode}.\n\n" +
+                         $"Quantitat requerida: {lineItem.Quantity}\n" +
+                         $"Quantitat disponible: {availableQuantity}\n" +
+                         $"Diferència: {lineItem.Quantity - availableQuantity}";
+
+            await _dialogService.ShowErrorAsync(message, "Stock Insuficient");
+            return; // No obrir el diàleg
+        }
+
+        // Si hi ha suficient stock, continuar amb l'assignació normal
         currentOrderId = selectedOrder.ID;
         currentLineNumber = lineItem.LineNumber;
         currentItemCode = lineItem.ItemCode;
