@@ -24,33 +24,40 @@ public class OrderController : ControllerBase
     }
     [AllowAnonymous]
     [HttpPost]
-    public async Task<IActionResult> ReceiveOrder([FromBody] Order orderRequest)
+    public async Task<IActionResult> ReceiveOrder([FromBody] Order[] orderRequests)
     {
         try
         {
-            if (orderRequest == null)
+            if (orderRequests == null || orderRequests.Length == 0)
                 return BadRequest("Order data is required");
-            if (orderRequest.CONF_ORDERLINESCollection == null || !orderRequest.CONF_ORDERLINESCollection.Any())
-                return BadRequest("At least 1 line item is required");
-            try
+
+            foreach (var orderRequest in orderRequests)
             {
-                await _slConnection.Request("CONF_ORDERS").PostAsync(orderRequest);
+                if (orderRequest.CONF_ORDERLINESCollection == null || !orderRequest.CONF_ORDERLINESCollection.Any())
+                    return BadRequest("Each order must have at least 1 line item");
+
+                try
+                {
+                    await _slConnection.Request("CONF_ORDERS").PostAsync(orderRequest);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Error sending order DocEntry {orderRequest.U_OrderId} to SAP");
+                    return StatusCode(500, $"Error sending order DocEntry {orderRequest.U_OrderId} to SAP: {ex.Message}");
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error sending order to SAP");
-                return StatusCode(500, $"Error sending order to SAP: {ex.Message}");
-            }
+
             return Ok(new
             {
-                message = $"Se han procesado las comandas con éxito.",
-                orderData = JsonSerializer.Serialize(orderRequest)
+                message = $"S'han processat {orderRequests.Length} comandes amb èxit.",
+                orders = orderRequests.Select(o => o.U_OrderId).ToArray()
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing order");
-            return StatusCode(500, $"Internal server error while processing order: {ex.Message}");
+            _logger.LogError(ex, "Error processing orders");
+            return StatusCode(500, $"Internal server error while processing orders: {ex.Message}");
         }
     }
+
 }
