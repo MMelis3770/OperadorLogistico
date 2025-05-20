@@ -10,7 +10,7 @@ Public Class SEI_CreateTablesSL
 
         Await CreateLogErrorUserTable()
 
-        'Await CreateUserDataDefinedField()
+        Await CreateUserDataDefinedField()
 
         Await CreateUDO()
 
@@ -37,6 +37,7 @@ Public Class SEI_CreateTablesSL
     End Function
 
     Private Async Function CreateUDO() As Task
+
         Const tableHeader As String = "CONFORDERS"
         Const headerDescription As String = "Confirmed Orders Header"
         Const tableDetail As String = "CONFORDERLINES"
@@ -88,9 +89,6 @@ Public Class SEI_CreateTablesSL
             Throw
         End Try
     End Function
-
-
-
     Private Async Function CreateUserTables(name As String, description As String, iType As BoUTBTableType) As Task
         Try
             Dim response = Await m_SBOAddon.oSLConnection.Request("UserTablesMD").Filter($"TableName eq '{name.Replace("@", "")}'").GetAllAsync(Of JObject)()
@@ -106,7 +104,6 @@ Public Class SEI_CreateTablesSL
         End Try
 
     End Function
-
     Private Async Function CreateUserDataField(
     table As String,
     field As String,
@@ -126,7 +123,7 @@ Public Class SEI_CreateTablesSL
             Dim response = Await m_SBOAddon.oSLConnection.Request("UserFieldsMD").Filter($"TableName eq '{table}' and Name eq '{field}'").GetAllAsync(Of Object)()
             If response.Count = 0 Then
                 If mandatory = BoYesNoEnum.tYES AndAlso String.IsNullOrEmpty(defaultValue) Then
-                    Throw New Exception($"Debe definirse un valor por defecto para el campo '{field}-{description}'")
+                    Throw New Exception($"A default value must be defined for the field '{field}-{description}'")
                 End If
 
                 Dim basicField = New With {

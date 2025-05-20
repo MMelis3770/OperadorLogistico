@@ -3,4 +3,5 @@
     Public Property ItemCode As String
     Public Property Quantity As Double
     Public Property DueDate As DateTime
+    Public Property BatchNumbers As Object
 End Class

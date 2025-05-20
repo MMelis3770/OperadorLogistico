@@ -31,7 +31,7 @@ Public Class SEI_ConfOrders
             ConfigurarMatrix()
             Me.Form.Visible = True
         Catch ex As Exception
-            SBO_Application.StatusBar.SetText("Error al cargar la pantalla 'Confirmation Orders'", SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
+            SBO_Application.StatusBar.SetText("Error loading the 'Confirmation Orders' screen", SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
             Me.Form.Close()
         End Try
     End Sub
@@ -116,7 +116,7 @@ Public Class SEI_ConfOrders
             End If
 
         Catch ex As Exception
-            SBO_Application.StatusBar.SetText($"Error al configurar Matrix: {ex.Message}",
+            SBO_Application.StatusBar.SetText($"Error configuring Matrix: {ex.Message}",
             SAPbouiCOM.BoMessageTime.bmt_Short,
             SAPbouiCOM.BoStatusBarMessageType.smt_Error)
         End Try
