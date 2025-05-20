@@ -277,7 +277,9 @@
     <EmbeddedResource Include="Images\sap48Rojo.ico" />
     <EmbeddedResource Include="Forms .srf\SEI_OrdersMonitor.srf" />
     <EmbeddedResource Include="Forms .srf\SEI_ConfOrders.srf" />
-    <Content Include="Images\Integration logistic.bmp" />
+    <EmbeddedResource Include="Images\IntegrationLogistic.bmp">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
     <Content Include="Libraries\DatabaseConnection.dll" />
     <Content Include="Libraries\Newtonsoft.Json.dll" />
     <Content Include="Libraries\SEIDOR-SLayer.dll" />
