@@ -347,7 +347,7 @@ Public Class SEI_OrdersMonitor
 
                 Catch ex As Exception
                     SBO_Application.StatusBar.SetText($"Error creating delivery for order #{orderBasic.DocEntry}: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                    LogDeliveryError(orderBasic.DocEntry, ex.Message)
+                    LogError(orderBasic.DocEntry, ex.Message)
                 End Try
             Next
         Catch ex As Exception
@@ -379,25 +379,6 @@ Public Class SEI_OrdersMonitor
             Throw New Exception($"Error getting confirmed lines: {ex.Message}")
         End Try
     End Function
-
-    Private Sub LogDeliveryError(docEntry As Integer, errorMessage As String)
-        Try
-            Dim userTable As SAPbobsCOM.UserTable = CType(SBO_Company.UserTables.Item("LogMonitorOrders"), SAPbobsCOM.UserTable)
-
-            userTable.UserFields.Fields.Item("U_DocEntry").Value = docEntry
-            userTable.UserFields.Fields.Item("U_Error").Value = errorMessage
-
-            Dim result As Integer = userTable.Add()
-            If result <> 0 Then
-                Dim errMsg As String = ""
-                Dim errCode As Integer
-                SBO_Company.GetLastError(errCode, errMsg)
-                SBO_Application.StatusBar.SetText($"Failed to insert log: {errMsg}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-            End If
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText($"Exception logging error: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-        End Try
-    End Sub
 
     Private Async Function PostInvoice(orders As List(Of Order)) As Task
         Try
@@ -444,7 +425,7 @@ Public Class SEI_OrdersMonitor
 
                 Catch ex As Exception
                     SBO_Application.StatusBar.SetText($"Error creating invoice for  : {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                    LogInvoiceError(cardCode, ex.Message)
+                    LogError(cardCode, ex.Message)
 
                 End Try
             Next
@@ -454,7 +435,7 @@ Public Class SEI_OrdersMonitor
         End Try
     End Function
 
-    Private Sub LogInvoiceError(cardCode As Integer, errorMessage As String)
+    Private Sub LogError(cardCode As Integer, errorMessage As String)
         Try
             Dim userTable As SAPbobsCOM.UserTable = CType(SBO_Company.UserTables.Item("LogMonitorOrders"), SAPbobsCOM.UserTable)
 
