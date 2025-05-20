@@ -31,6 +31,9 @@ namespace BlazorTemplate.Interfaces
         // Asignar automáticamente batches a líneas sin asignar
         Task<bool> AutoAssignBatchesToOrderAsync(int orderId);
 
+        // Verificar si hay suficientes cantidad para la línea
+        Task<(bool HasSufficientStock, int AvailableQuantity)> ValidateStockAvailabilityAsync(string itemCode, int requiredQuantity);
+
         // Inicializar datos de ejemplo para pruebas
         void InitializeTestData();
     }

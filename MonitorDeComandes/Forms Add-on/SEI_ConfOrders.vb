@@ -1,4 +1,5 @@
-﻿Imports System.Threading.Tasks
+﻿Imports System.Collections
+Imports System.Threading.Tasks
 Imports Newtonsoft.Json.Linq
 Imports SAPbobsCOM
 Imports SAPbouiCOM
@@ -9,33 +10,25 @@ Public Class SEI_ConfOrders
     Inherits SEI_Form
 
 #Region "ATRIBUTOS"
-    Private Const UDO_FormType As String = "UDO_FT_CONF_ORDERS"
-    Private Const UDO_ObjectName As String = "CONF_ORDERS"
-    Private Const UDO_DetailObjectName As String = "CONF_ORDERLINES"
+
 #End Region
 
 #Region "CONSTANTES"
     Private Structure FormControls
-        Const btnAdd As String = "1"
-        Const btnCancel As String = "2"
 
-        Const et_DocEntry As String = "1_U_E"
-        Const CFL_DocEntry As String = "CFL_0"
-
-        Const et_CardCode As String = "0_U_E"
-        Const CFL_CardCode As String = "CFL_1"
 
     End Structure
 #End Region
 
 #Region "CONSTRUCTOR"
     Public Sub New(ByRef parentaddon As SEI_Addon)
-        MyBase.New(parentaddon, enSBO_LoadFormTypes.XmlFile, enAddonFormType.f_ConfOrders, enAddonMenus.ConfOrders)
+        MyBase.New(parentaddon, enSBO_LoadFormTypes.XmlFile, enAddonFormType.f_ConfOrders, enAddonMenus.ConfOrders, "CONFORDERS")
         Me.Initialize()
     End Sub
 
     Private Sub Initialize()
         Try
+            ConfigurarMatrix()
             Me.Form.Visible = True
         Catch ex As Exception
             SBO_Application.StatusBar.SetText("Error al cargar la pantalla 'Confirmation Orders'", SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
@@ -54,16 +47,6 @@ Public Class SEI_ConfOrders
 
         If Trim(pVal.ItemUID) <> "" Then
             Select Case pVal.ItemUID
-                Case FormControls.et_DocEntry
-                    Select Case pVal.EventType
-                        Case SAPbouiCOM.BoEventTypes.et_CHOOSE_FROM_LIST
-                            Me.HandleChooseFromListEvent(pVal, BubbleEvent)
-                    End Select
-                Case FormControls.et_CardCode
-                    Select Case pVal.EventType
-                        Case SAPbouiCOM.BoEventTypes.et_CHOOSE_FROM_LIST
-                            Me.HandleChooseFromListEvent(pVal, BubbleEvent)
-                    End Select
             End Select
 
         Else
@@ -113,48 +96,31 @@ Public Class SEI_ConfOrders
     Public Overrides Sub HANDLE_WIDGET_EVENTS(ByRef pWidgetData As SAPbouiCOM.WidgetData, ByRef BubbleEvent As Boolean)
     End Sub
     Private Sub HandleChooseFromListEvent(ByRef pVal As SAPbouiCOM.ItemEvent, ByRef BubbleEvent As Boolean)
-        Dim oCFLEvento As SAPbouiCOM.IChooseFromListEvent = Nothing
-        Dim oDataTable As SAPbouiCOM.DataTable = Nothing
-        Dim oEditText As SAPbouiCOM.EditText = Nothing
-
-        Try
-            If pVal.EventType = SAPbouiCOM.BoEventTypes.et_CHOOSE_FROM_LIST Then
-                oCFLEvento = DirectCast(pVal, SAPbouiCOM.IChooseFromListEvent)
-
-                If oCFLEvento.BeforeAction = False Then
-                    oDataTable = oCFLEvento.SelectedObjects
-
-                    If Not oDataTable Is Nothing AndAlso oDataTable.Rows.Count > 0 Then
-                        Select Case oCFLEvento.ChooseFromListUID
-
-                            Case "CFL_0"
-                                Dim docEntry As String = oDataTable.GetValue("U_DocEntry", 0).ToString()
-
-                                oEditText = DirectCast(Me.Form.Items.Item(FormControls.et_DocEntry).Specific, SAPbouiCOM.EditText)
-                                oEditText.Value = docEntry
-
-                            Case "CFL_1"
-                                Dim cardCode As String = oDataTable.GetValue("U_CardCode", 0).ToString()
-
-                                oEditText = DirectCast(Me.Form.Items.Item(FormControls.et_CardCode).Specific, SAPbouiCOM.EditText)
-                                oEditText.Value = cardCode
-
-                        End Select
-                    End If
-                End If
-            End If
-        Catch ex As Exception
-            SBO_Application.SetStatusBarMessage("ERROR HandleChooseFromListEvent: " & ex.Message, SAPbouiCOM.BoMessageTime.bmt_Short, True)
-        Finally
-            LiberarObjCOM(oCFLEvento)
-            LiberarObjCOM(oDataTable)
-            LiberarObjCOM(oEditText)
-        End Try
     End Sub
 #End Region
 
 #Region "FUNCIONES FORM"
 
+    Private Sub ConfigurarMatrix()
+        Try
+            Dim oMatrix As SAPbouiCOM.Matrix = CType(Form.Items.Item("Item_5").Specific, SAPbouiCOM.Matrix)
+
+            If oMatrix IsNot Nothing Then
+                With oMatrix
+                    .Columns.Item("#").Width = 22
+                    .Columns.Item("C_0_3").Width = 130
+                    .Columns.Item("C_0_1").Width = 130
+                    .Columns.Item("C_0_2").Width = 130
+                    .Columns.Item("C_0_4").Width = 130
+                End With
+            End If
+
+        Catch ex As Exception
+            SBO_Application.StatusBar.SetText($"Error al configurar Matrix: {ex.Message}",
+            SAPbouiCOM.BoMessageTime.bmt_Short,
+            SAPbouiCOM.BoStatusBarMessageType.smt_Error)
+        End Try
+    End Sub
 
 #End Region
 

@@ -207,7 +207,7 @@ namespace Console.Processes
                 // INSERT - Inserir només els nous lots
                 string insertBatchesQuery = $@"
                     INSERT INTO {_logisticDbName}.dbo.Batches (ItemCode, BatchNum, PrdDate, ExpDate, Quantity)
-                    SELECT 
+                    SELECT DISTINCT
                         b.ItemCode COLLATE SQL_Latin1_General_CP1_CI_AS AS ItemCode, 
                         b.BatchNum COLLATE SQL_Latin1_General_CP1_CI_AS AS BatchNum,
                         b.PrdDate, 

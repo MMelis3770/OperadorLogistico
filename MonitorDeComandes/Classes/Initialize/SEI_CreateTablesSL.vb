@@ -8,8 +8,25 @@ Public Class SEI_CreateTablesSL
 
     Public Async Function AddUserTables() As Task
 
+        Await CreateLogErrorUserTable()
+
         'Await CreateUserDataDefinedField()
+
         Await CreateUDO()
+
+    End Function
+
+    Private Async Function CreateLogErrorUserTable() As Threading.Tasks.Task
+
+        Const tableName As String = "LogMonitorOrders"
+
+        Const tableDescription As String = "Log Monitor Orders"
+
+        Await CreateUserTables(tableName, tableDescription, BoUTBTableType.bott_NoObjectAutoIncrement)
+
+        Await CreateUserDataField("@" & tableName, "CardCode", "Client ID", BoFieldTypes.db_Numeric, 10)
+
+        Await CreateUserDataField("@" & tableName, "Error", "Error", BoFieldTypes.db_Alpha, 254)
 
     End Function
 
@@ -18,26 +35,27 @@ Public Class SEI_CreateTablesSL
         Await CreateUserDataField("ORDR", "OrdersStatus", "OrdersStatus", BoFieldTypes.db_Alpha, 50)
 
     End Function
+
     Private Async Function CreateUDO() As Task
-        Const tableHeader As String = "CONF_ORDERS"
+        Const tableHeader As String = "CONFORDERS"
         Const headerDescription As String = "Confirmed Orders Header"
-        Const tableDetail As String = "CONF_ORDERLINES"
+        Const tableDetail As String = "CONFORDERLINES"
         Const detailDescription As String = "Confirmed Order Lines"
         Try
             Await CreateUserTables(tableHeader, headerDescription, BoUTBTableType.bott_Document)
             Await CreateUserTables(tableDetail, detailDescription, BoUTBTableType.bott_DocumentLines)
 
-            Await CreateUserDataField("@" & tableHeader, "DocEntry", "Order ID", BoFieldTypes.db_Numeric, 10)
-            Await CreateUserDataField("@" & tableHeader, "CardCode", "Customer Code", BoFieldTypes.db_Numeric, 10)
+            Await CreateUserDataField("@" & tableHeader, "OrderId", "Order ID (DocEntry)", BoFieldTypes.db_Numeric, 10, linkedSystemObject:=BoObjectTypes.oOrders)
+            Await CreateUserDataField("@" & tableHeader, "CardCode", "Customer Code", BoFieldTypes.db_Alpha, 10, linkedSystemObject:=BoObjectTypes.oBusinessPartners)
             Await CreateUserDataField("@" & tableHeader, "DocDate", "Document Date", BoFieldTypes.db_Date)
             Await CreateUserDataField("@" & tableHeader, "DocDueDate", "Delivery Date", BoFieldTypes.db_Date)
 
-            Dim statusCodes As String() = {"C", "E"}
-            Dim statusNames As String() = {"Confirmed", "Error"}
+            Dim statusCodes As String() = {"C", "R"}
+            Dim statusNames As String() = {"Confirmed", "Rejected"}
             Await CreateUserDataField("@" & tableHeader, "Status", "Status", BoFieldTypes.db_Alpha, 1, codesValidValues:=statusCodes, namesValidValues:=statusNames)
             Await CreateUserDataField("@" & tableHeader, "ErrorMsg", "Error Message", BoFieldTypes.db_Alpha, 254)
 
-            Await CreateUserDataField("@" & tableDetail, "DocEntry", "Order ID", BoFieldTypes.db_Numeric, 10)
+            Await CreateUserDataField("@" & tableDetail, "OrderId", "Order ID (DocEntry)", BoFieldTypes.db_Numeric, 10, linkedSystemObject:=BoObjectTypes.oOrders)
             Await CreateUserDataField("@" & tableDetail, "LineNum", "Line Number", BoFieldTypes.db_Numeric, 3)
             Await CreateUserDataField("@" & tableDetail, "ItemCode", "Item Code", BoFieldTypes.db_Alpha, 20)
             Await CreateUserDataField("@" & tableDetail, "Quantity", "Quantity", BoFieldTypes.db_Float, 10, BoFldSubTypes.st_Quantity)
@@ -59,7 +77,7 @@ Public Class SEI_CreateTablesSL
                 fatherMenu:=Nothing,
                 position:=Nothing,                    '
                 array_ChildTables:={tableDetail},
-                array_FindFields:=Nothing,
+                array_FindFields:={"U_OrderId", "U_CardCode"},
                 array_FormFields:=Nothing,
                 formSRFPath:=Nothing
             )
@@ -70,6 +88,8 @@ Public Class SEI_CreateTablesSL
             Throw
         End Try
     End Function
+
+
 
     Private Async Function CreateUserTables(name As String, description As String, iType As BoUTBTableType) As Task
         Try
@@ -189,6 +209,16 @@ Public Class SEI_CreateTablesSL
         name = name.Replace("@", "").ToUpper()
         Dim response = Await m_SBOAddon.oSLConnection.Request("UserObjectsMD").Filter($"Code eq '{name}'").GetAllAsync(Of Object)()
         If response.Count = 0 Then
+            Dim findColumnsArray As Object = Nothing
+            If canFind = BoYesNoEnum.tYES AndAlso array_FindFields IsNot Nothing Then
+                findColumnsArray = array_FindFields.Select(Function(f, i) New With {
+                .ColumnNumber = i + 1,
+                .ColumnAlias = f,
+                .ColumnDescription = f,
+                .Code = name
+            }).ToList()
+            End If
+
             Dim userObject = New With {
             .CanCancel = canCancel.ToString(),
             .CanClose = canClose.ToString(),
@@ -205,7 +235,7 @@ Public Class SEI_CreateTablesSL
             .ManageSeries = manageSeries.ToString(),
             .UseUniqueFormType = BoYesNoEnum.tYES.ToString(),
             .UserObjectMD_ChildTables = If(array_ChildTables IsNot Nothing, array_ChildTables.Select(Function(t) New With {.TableName = t}).ToList(), Nothing),
-            .FindColumns = If(canFind = BoYesNoEnum.tYES AndAlso array_FindFields IsNot Nothing, array_FindFields.Select(Function(f) New With {.ColumnAlias = f}).ToList(), Nothing),
+            .UserObjectMD_FindColumns = findColumnsArray,
             .FormColumns = If(defaultForm = BoYesNoEnum.tYES AndAlso array_FormFields IsNot Nothing, array_FormFields.Where(Function(f) Not f.Trim().ToUpper().Equals("CODE")).Select(Function(f) New With {.FormColumnAlias = f}).Prepend(New With {.FormColumnAlias = "Code"}).ToList(), Nothing),
             .FormSRF = If(Not String.IsNullOrEmpty(formSRFPath), formSRFPath.Replace("\", "/"), Nothing),
             .EnableEnhancedForm = BoYesNoEnum.tNO.ToString(),

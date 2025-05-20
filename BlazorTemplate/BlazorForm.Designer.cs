@@ -51,7 +51,7 @@
             ForeColor = SystemColors.ControlText;
             Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "BlazorForm";
-            Text = "Document Intelligence Application";
+            Text = "te quiero vikingo :*";
             ResumeLayout(false);
         }
 

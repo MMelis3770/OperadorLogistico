@@ -1,12 +1,8 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.VisualBasic;
-using SAPbobsCOM;
 using SEIDOR_SLayer;
 using SeidorSmallWebApi.Entities;
-using System.Data.Common;
-using System.Text.Json;
-using System.Threading;
 namespace SeidorSmallWebApi.CustomControllers.Controllers;
 [ApiController]
 [Authorize]

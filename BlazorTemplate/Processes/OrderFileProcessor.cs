@@ -110,6 +110,12 @@ public class OrderFileProcessor
                     {
                         try
                         {
+                            Console.WriteLine($"Parseando LINE: {line}");
+                            Console.WriteLine($"Parts[1] (DocEntry): '{int.Parse(parts[1].Trim())}'");
+                            Console.WriteLine($"Parts[2] (LineNum): '{int.Parse(parts[2].Trim())}'");
+                            Console.WriteLine($"Parts[3] (LineNum): '{parts[3].Trim()}'");
+                            Console.WriteLine($"Parts[4] (Quantity): '{int.Parse(parts[4].Trim())}'");
+
                             var lineItem = new LineItem
                             {
                                 DocEntry = int.Parse(parts[1].Trim()),
