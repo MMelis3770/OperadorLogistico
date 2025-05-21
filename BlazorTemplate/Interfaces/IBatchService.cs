@@ -33,6 +33,11 @@ namespace BlazorTemplate.Interfaces
 
         // Verificar si hay suficientes cantidad para la línea
         Task<(bool HasSufficientStock, int AvailableQuantity)> ValidateStockAvailabilityAsync(string itemCode, int requiredQuantity);
+        
+        // Método para actualizar el estado de procesamiento de una orden
+        Task<bool> UpdateOrderProcessedStatusAsync(int docEntry);
+        Task<bool> UpdateOrderErrorStatusAsync(int docEntry, string errorMessage);
+        Task<string> GetOrderErrorMessageAsync(int docEntry);
 
         // Inicializar datos de ejemplo para pruebas
         void InitializeTestData();

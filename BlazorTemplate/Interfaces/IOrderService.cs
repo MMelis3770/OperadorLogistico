@@ -4,6 +4,6 @@ namespace BlazorTemplate.Interfaces
     public interface IOrderService
     {
         Task<List<OrderData>> GetOrdersAsync();
-        Task<bool> ConfirmOrderToSAP(int orderId);
+        Task<bool> ConfirmOrderToSQL(int orderId);
     }
 }

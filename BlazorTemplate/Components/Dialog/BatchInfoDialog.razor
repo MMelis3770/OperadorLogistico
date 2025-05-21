@@ -64,37 +64,14 @@
                                 <tr>
                                     <th>Lote</th>
                                     <th>Cantidad</th>
-                                    <th>Vigencia</th>
-                                    <th>Disponible</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var assignment in BatchAssignments)
                                 {
-                                    var batchInfo = GetBatchInfo(assignment.BatchId);
                                     <tr>
                                         <td>@assignment.BatchId</td>
                                         <td>@assignment.Quantity</td>
-                                        <td>
-                                            @if (batchInfo != null)
-                                            {
-                                                <span>@batchInfo.StartDate.ToString("yyyy-MM-dd") a @batchInfo.EndDate.ToString("yyyy-MM-dd")</span>
-                                            }
-                                            else
-                                            {
-                                                <span>--</span>
-                                            }
-                                        </td>
-                                        <td>
-                                            @if (batchInfo != null)
-                                            {
-                                                <span>@batchInfo.AvailableQuantity</span>
-                                            }
-                                            else
-                                            {
-                                                <span>--</span>
-                                            }
-                                        </td>
                                     </tr>
                                 }
                             </tbody>
@@ -102,8 +79,6 @@
                                 <tr>
                                     <td><strong>Total</strong></td>
                                     <td><strong>@BatchAssignments.Sum(a => a.Quantity)</strong></td>
-                                    <td></td>
-                                    <td></td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -175,7 +150,6 @@
     [Parameter] public int Quantity { get; set; }
 
     private List<BatchAssignmentDialog.BatchAssignment> BatchAssignments { get; set; } = new List<BatchAssignmentDialog.BatchAssignment>();
-    private Dictionary<string, Batch> BatchDetails { get; set; } = new Dictionary<string, Batch>();
     private bool IsLoading { get; set; } = false;
 
     protected override async Task OnParametersSetAsync()
@@ -195,30 +169,16 @@
 
             // Cargar las asignaciones de batch para esta línea
             BatchAssignments = await _batchService.GetBatchAssignmentsForOrderLineAsync(OrderId, LineNumber);
-
-            // Cargar la información de todos los batches
-            var allBatches = await _batchService.GetAvailableBatchesAsync();
-            BatchDetails = allBatches.ToDictionary(b => b.BatchId);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Console.WriteLine($"Error al cargar asignaciones: {ex.Message}");
         }
         finally
         {
             IsLoading = false;
             StateHasChanged();
         }
-    }
-
-    private Batch GetBatchInfo(string batchId)
-    {
-        if (string.IsNullOrEmpty(batchId))
-            return null;
-
-        if (BatchDetails.TryGetValue(batchId, out var batch))
-            return batch;
-
-        return null;
     }
 
     private async Task CloseDialog()

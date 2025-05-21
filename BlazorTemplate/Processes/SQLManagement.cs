@@ -43,18 +43,112 @@ namespace BlazorTemplate.Processes
             }
         }
 
-        public void ValidateOrderDate(DateTime orderDate, DateTime docDueDate)
+        public async Task<bool> UpdateOrderProcessedStatusAsync(int docEntry, bool isProcessed = true)
         {
-            // PENDIENTE REVISAR PARA BATCH
-            //try
-            //{
-            //    var currentDate = DateTime.Now;
-            //    return currentDate >= orderDate && currentDate <= docDueDate;
-            //}
-            //catch (Exception ex)
-            //{
-            //    throw new Exception($"Error validating order dates: {ex.Message}", ex);
-            //}
+            try
+            {
+                string updateQuery = @"
+            UPDATE dbo.Orders 
+            SET IsProcessed = @IsProcessed
+            WHERE DocEntry = @DocEntry";
+
+                // Crear un objeto anónimo para los parámetros - esto funciona con el método Query
+                var parameters = new
+                {
+                    DocEntry = docEntry,
+                    IsProcessed = isProcessed ? 1 : 0
+                };
+
+                // Para operaciones UPDATE que no devuelven resultados, necesitamos usar Execute con una lista
+                // Creamos una lista con un solo elemento para el objeto de parámetros
+                var paramList = new List<object> { parameters };
+
+                // Ejecutar la consulta de actualización
+                _connection.Execute(updateQuery, paramList);
+
+                // Simular una operación asíncrona
+                await Task.Delay(50);
+
+                // Como no podemos saber directamente cuántas filas se afectaron (Execute no devuelve un valor)
+                // verificamos si la orden existe después de la actualización
+                var verifyQuery = "SELECT COUNT(1) FROM dbo.Orders WHERE DocEntry = @DocEntry AND IsProcessed = @IsProcessed";
+                var result = _connection.Query<int>(verifyQuery, parameters).FirstOrDefault();
+
+                // Devolver true si se encontró al menos un registro con los valores actualizados
+                return result > 0;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error updating processed status for order {docEntry}: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<bool> UpdateOrderErrorStatusAsync(int docEntry, string errorMessage)
+        {
+            try
+            {
+                string updateQuery = @"
+            UPDATE dbo.Orders 
+            SET HasError = 1,
+                ErrorMessage = @ErrorMessage
+            WHERE DocEntry = @DocEntry";
+
+                // Crear un objeto anónimo para los parámetros y envolverlo en una lista
+                var paramObj = new
+                {
+                    DocEntry = docEntry,
+                    ErrorMessage = errorMessage
+                };
+
+                var parametersList = new List<object> { paramObj };
+
+                // Ejecutar la consulta de actualización
+                _connection.Execute(updateQuery, parametersList);
+
+                // Verificar si la actualización fue exitosa consultando después
+                var verifyQuery = "SELECT COUNT(1) FROM dbo.Orders WHERE DocEntry = @DocEntry AND HasError = 1";
+                var result = _connection.Query<int>(verifyQuery, new { DocEntry = docEntry }).FirstOrDefault();
+
+                // Simular una operación asíncrona
+                await Task.Delay(50);
+
+                // Devolver true si se encontró el registro actualizado
+                return result > 0;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error updating error status for order {docEntry}: {ex.Message}", ex);
+            }
+        }
+
+        // Método para obtener una orden con su información de error
+        public OrderData GetOrderWithErrorInfoFromDB(int docEntry)
+        {
+            try
+            {
+                string query = @"
+            SELECT DocEntry, CardCode, OrderDate, DocDueDate, 
+                   IsProcessed, HasError, ErrorMessage 
+            FROM dbo.Orders 
+            WHERE DocEntry = @DocEntry";
+
+                var parameters = new { DocEntry = docEntry };
+
+                // Obtener datos básicos de la orden
+                var order = _connection.Query<OrderData>(query, parameters).FirstOrDefault();
+
+                if (order == null)
+                    throw new Exception($"No se encontró la orden con DocEntry {docEntry}");
+
+                // Obtener las líneas de la orden
+                order.LineItems = GetOrderLinesFromDatabase(docEntry);
+
+                return order;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error obteniendo la orden {docEntry} con información de error: {ex.Message}", ex);
+            }
         }
 
         public bool GetItems(string itemCode)
@@ -71,21 +165,6 @@ namespace BlazorTemplate.Processes
             {
                 throw new Exception($"Error getting items: {ex.Message}", ex);
             }
-        }
-
-        public bool GetBatches(string itemCode)
-        {
-            // Escapar caracteres para prevenir SQL injection
-            if (string.IsNullOrWhiteSpace(itemCode))
-                throw new ArgumentException("ItemCode cannot be null or empty");
-
-            // Escapar comillas simples
-            itemCode = itemCode.Replace("'", "''");
-
-            string batchQuery = $"SELECT * FROM dbo.Batches WHERE ItemCode = '{itemCode}'";
-            batches = _connection.Query<Batch>(batchQuery).ToList();
-
-            return batches != null && batches.Any();
         }
 
         public void LoadOrdersToSQL(List<OrderData> ordersToSQL)
@@ -174,17 +253,42 @@ namespace BlazorTemplate.Processes
             }
         }
 
+        public async Task<string> GetOrderErrorMessageAsync(int docEntry)
+        {
+            try
+            {
+                string query = @"
+            SELECT ErrorMessage 
+            FROM dbo.Orders 
+            WHERE DocEntry = @DocEntry AND HasError = 1";
+
+                var parameters = new { DocEntry = docEntry };
+
+                var result = _connection.Query<string>(query, parameters).FirstOrDefault();
+
+                // Simular una operación asíncrona
+                await Task.Delay(50);
+
+                return result ?? "No se encontró mensaje de error para esta orden";
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error obteniendo mensaje de error para orden {docEntry}: {ex.Message}", ex);
+            }
+        }
+
         // Método para obtener todas las órdenes desde la base de datos
         public List<OrderData> GetOrdersFromDatabase()
         {
             try
             {
                 string query = @"
-        SELECT o.DocEntry, o.CardCode, o.OrderDate, o.DocDueDate, 
-               COUNT(l.LineNum) as LineCount 
-        FROM dbo.Orders o 
-        LEFT JOIN dbo.OrderLines l ON o.DocEntry = l.DocEntry 
-        GROUP BY o.DocEntry, o.CardCode, o.OrderDate, o.DocDueDate";
+    SELECT o.DocEntry, o.CardCode, o.OrderDate, o.DocDueDate, 
+           COUNT(l.LineNum) as LineCount 
+    FROM dbo.Orders o 
+    LEFT JOIN dbo.OrderLines l ON o.DocEntry = l.DocEntry 
+    WHERE o.IsProcessed = 0 AND o.HasError = 0
+    GROUP BY o.DocEntry, o.CardCode, o.OrderDate, o.DocDueDate";
 
                 // Definir una clase específica para el resultado
                 var ordersWithCount = _connection.Query<OrderDataWithCount>(query);

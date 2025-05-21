@@ -264,6 +264,8 @@
     [Parameter] public int Quantity { get; set; }
     [Parameter] public EventCallback<bool> OnBatchAssigned { get; set; }
 
+
+    private FluentDialog dialogRef;
     private List<Batch> AvailableBatches { get; set; } = new List<Batch>();
     private string SelectedBatchId { get; set; }
     private int QuantityToAssign { get; set; } = 0;
