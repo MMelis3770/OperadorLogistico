@@ -472,7 +472,23 @@
                     // Asumiendo que _batchService tiene acceso a SQLManagement o inyectarlo directamente
                     bool updateSuccess = await _batchService.UpdateOrderProcessedStatusAsync(order.DocEntry);
 
-                    if (!updateSuccess)
+                    if (updateSuccess)
+                    {
+                        // Si la actualización del estado fue exitosa, guardar los lotes asignados
+                        try
+                        {
+                            bool batchesSaved = await _batchService.SaveAssignedBatchesToDatabaseAsync(order.DocEntry, order.LineItems);
+                            if (!batchesSaved)
+                            {
+                                Console.WriteLine($"Advertencia: No se pudieron guardar los lotes asignados para la orden {order.DocEntry}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error al guardar lotes asignados para orden {order.DocEntry}: {ex.Message}");
+                        }
+                    }
+                    else
                     {
                         failedStatusUpdates.Add(order.DocEntry);
                     }

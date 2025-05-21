@@ -3,6 +3,7 @@ using BlazorTemplate.Models;
 using DatabaseConnection;
 using DatabaseConnection.Enum;
 using Microsoft.Extensions.Configuration;
+using static Microsoft.FluentUI.AspNetCore.Components.Icons.Filled.Size20;
 
 namespace BlazorTemplate.Processes
 {
@@ -350,6 +351,64 @@ namespace BlazorTemplate.Processes
             }
         }
 
+        // Método directo para obtener lotes asignados
+        public List<AssignedBatch> GetBatchesDirectFromDatabase(int docEntry, int lineNumber)
+        {
+            try
+            {
+                // Hacer una consulta simple y directa, solo filtrando por DocEntry
+                string query = @"
+        SELECT DocEntry, LineNum, BatchNum, Quantity 
+        FROM [TestOperadorLogistic].[dbo].[AssignedBatches] 
+        WHERE DocEntry = @DocEntry";
+
+                var parameters = new { DocEntry = docEntry };
+
+                // Ejecutar la consulta y obtener los resultados
+                var results = _connection.Query<AssignedBatch>(query, parameters).ToList();
+
+                // Imprimir todos los resultados sin filtrar más
+                Console.WriteLine($"*** CONSULTA DIRECTA: Lotes para DocEntry={docEntry}: {results.Count} ***");
+                foreach (var batch in results)
+                {
+                    Console.WriteLine($"Lote encontrado: DocEntry={batch.DocEntry}, LineNum={batch.LineNum}, BatchNum={batch.BatchNum}, Quantity={batch.Quantity}");
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"ERROR en consulta directa: {ex.Message}");
+                return new List<AssignedBatch>();
+            }
+        }
+
+        // Método para obtener los lotes asignados a una orden desde la tabla AssignedBatches
+        public async Task<List<AssignedBatch>> GetAssignedBatchesForOrderAsync(int docEntry)
+        {
+            try
+            {
+                string query = @"
+            SELECT DocEntry, LineNum, BatchNum, Quantity 
+            FROM [TestOperadorLogistic].[dbo].[AssignedBatches] 
+            WHERE DocEntry = @DocEntry 
+            ORDER BY LineNum, BatchNum";
+
+                var parameters = new { DocEntry = docEntry };
+
+                var assignedBatches = _connection.Query<AssignedBatch>(query, parameters);
+
+                // Simular operación asíncrona
+                await Task.Delay(50);
+
+                return assignedBatches.ToList();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error getting assigned batches for order {docEntry}: {ex.Message}", ex);
+            }
+        }
+
         // Afegir aquest mètode per obtenir batches per ItemCode
         public async Task<List<Batch>> GetBatchesForItemAsync(string itemCode)
         {
@@ -404,6 +463,82 @@ namespace BlazorTemplate.Processes
             }
         }
 
+        // Método para obtener todas las órdenes desde la base de datos, incluyendo procesadas y con errores
+        public List<OrderData> GetAllOrdersFromDatabase()
+        {
+            try
+            {
+                string query = @"
+SELECT o.DocEntry, o.CardCode, o.OrderDate, o.DocDueDate, o.IsProcessed, o.HasError, o.ErrorMessage,
+       COUNT(l.LineNum) as LineCount 
+FROM dbo.Orders o 
+LEFT JOIN dbo.OrderLines l ON o.DocEntry = l.DocEntry 
+GROUP BY o.DocEntry, o.CardCode, o.OrderDate, o.DocDueDate, o.IsProcessed, o.HasError, o.ErrorMessage
+ORDER BY o.DocEntry DESC";  // Ordenar por ID descendente para ver las más recientes primero
+
+                var ordersWithCount = _connection.Query<OrderDataWithCount>(query);
+
+                List<OrderData> result = new List<OrderData>();
+
+                foreach (var item in ordersWithCount)
+                {
+                    result.Add(new OrderData
+                    {
+                        DocEntry = item.DocEntry,
+                        CardCode = item.CardCode,
+                        OrderDate = item.OrderDate,
+                        DocDueDate = item.DocDueDate,
+                        IsProcessed = item.IsProcessed,
+                        HasError = item.HasError,
+                        ErrorMessage = item.ErrorMessage,
+                        LineItems = new List<LineItem>() // Se llenarán si es necesario con GetOrderLinesFromDatabase
+                    });
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error getting all orders from database: {ex.Message}", ex);
+            }
+        }
+
+        // Método para insertar asignaciones de batch cuando una orden es procesada
+        public async Task<bool> SaveAssignedBatchesAsync(int docEntry, List<LineItem> lineItems)
+        {
+            try
+            {
+                // Filtrar líneas con lotes asignados
+                var linesWithBatches = lineItems.Where(li => !string.IsNullOrEmpty(li.Batch)).ToList();
+
+                foreach (var line in linesWithBatches)
+                {
+                    string insertQuery = @"
+                INSERT INTO dbo.AssignedBatches (DocEntry, LineNum, BatchNum, Quantity) 
+                VALUES (@DocEntry, @LineNum, @BatchNum, @Quantity)";
+
+                    var parameters = new List<object>
+            {
+                new
+                {
+                    DocEntry = docEntry,
+                    LineNum = line.LineNum,
+                    BatchNum = line.Batch,
+                    Quantity = line.Quantity
+                }
+            };
+
+                    _connection.Execute(insertQuery, parameters);
+                }
+
+                await Task.Delay(50); // Simular operación asíncrona
+                return true;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error saving assigned batches for order {docEntry}: {ex.Message}", ex);
+            }
+        }
 
         // Método para obtener las líneas de una orden específica
         public List<LineItem> GetOrderLinesFromDatabase(int docEntry)

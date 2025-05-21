@@ -127,6 +127,20 @@ namespace BlazorTemplate.Services
             return true;
         }
 
+        public async Task<List<AssignedBatch>> GetAssignedBatchesFromDatabaseAsync(int docEntry)
+        {
+            try
+            {
+                // Llamar al método correspondiente en SQLManagement
+                return await _sqlManagement.GetAssignedBatchesForOrderAsync(docEntry);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al obtener lotes asignados: {ex.Message}");
+                return new List<AssignedBatch>();
+            }
+        }
+
         public async Task<string> GetAssignedBatchForOrderLineAsync(int orderId, int lineNumber)
         {
             await Task.Delay(50);
@@ -334,6 +348,20 @@ namespace BlazorTemplate.Services
             {
                 // En cas d'error, assumim que no hi ha stock suficient
                 return (false, 0);
+            }
+        }
+
+        public async Task<bool> SaveAssignedBatchesToDatabaseAsync(int docEntry, List<LineItem> lineItems)
+        {
+            try
+            {
+                // Simplemente llama al método en SQLManagement
+                return await _sqlManagement.SaveAssignedBatchesAsync(docEntry, lineItems);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al guardar lotes asignados: {ex.Message}");
+                return false;
             }
         }
 

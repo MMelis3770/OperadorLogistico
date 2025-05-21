@@ -1,0 +1,231 @@
+﻿@using BlazorTemplate.Models
+@using BlazorTemplate.Interfaces
+@using Microsoft.FluentUI.AspNetCore.Components
+@using BlazorTemplate.Services
+@using BlazorTemplate.Processes
+@inject IBatchService _batchService
+@inject SQLManagement _sqlManagement
+
+@if (IsOpen)
+{
+    <FluentDialog Open="@IsOpen" Width="500px">
+        <FluentDialogHeader>
+            <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
+                <FluentIcon Value="@(new Icons.Regular.Size24.SlideSearch())" Color="Color.Accent" />
+                <h3>Información de Lotes</h3>
+            </FluentStack>
+        </FluentDialogHeader>
+        <FluentDialogBody>
+            @if (IsLoading)
+            {
+                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
+                    <FluentProgressRing />
+                    <span>Cargando información de lotes...</span>
+                </FluentStack>
+            }
+            else
+            {
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="12">
+                    <FluentGrid Columns="2" ColumnGap="16" RowGap="12">
+                        <FluentGridItem>
+                            <FluentLabel>Orden:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span>@OrderId</span>
+                        </FluentGridItem>
+
+                        <FluentGridItem>
+                            <FluentLabel>Línea:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span>@(LineNumber + 1)</span>
+                        </FluentGridItem>
+
+                        <FluentGridItem>
+                            <FluentLabel>Artículo:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span>@ItemCode</span>
+                        </FluentGridItem>
+
+                        <FluentGridItem>
+                            <FluentLabel>Cantidad Total:</FluentLabel>
+                        </FluentGridItem>
+                        <FluentGridItem>
+                            <span>@Quantity</span>
+                        </FluentGridItem>
+                    </FluentGrid>
+
+                    <FluentDivider Style="margin: 12px 0;" />
+
+                    @if (AssignedBatches?.Any() == true)
+                    {
+                        <h4>Lotes Asignados</h4>
+                        <table class="batch-info-table">
+                            <thead>
+                                <tr>
+                                    <th>Lote</th>
+                                    <th>Cantidad</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var batch in AssignedBatches)
+                                {
+                                    <tr>
+                                        <td>@batch.BatchNum</td>
+                                        <td>@batch.Quantity</td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td><strong>Total</strong></td>
+                                    <td><strong>@AssignedBatches.Sum(a => a.Quantity)</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+
+                        @if (AssignedBatches.Sum(a => a.Quantity) < Quantity)
+                        {
+                            <div class="warning-message">
+                                <FluentIcon Value="@(new Icons.Regular.Size16.Warning())" Color="Color.Warning" />
+                                <span>Atención: Solo se han asignado @AssignedBatches.Sum(a => a.Quantity) de @Quantity unidades.</span>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="warning-message">
+                            <FluentIcon Value="@(new Icons.Regular.Size16.Warning())" Color="Color.Warning" />
+                            <span>Este artículo no tiene lotes asignados.</span>
+                        </div>
+                    }
+                </FluentStack>
+            }
+        </FluentDialogBody>
+        <FluentDialogFooter>
+            <FluentButton Appearance="Appearance.Accent" OnClick="@CloseDialog">Cerrar</FluentButton>
+        </FluentDialogFooter>
+    </FluentDialog>
+}
+
+<style>
+    .batch-info-table {
+        width: 100%;
+        margin-top: 12px;
+        border-collapse: collapse;
+    }
+
+        .batch-info-table th, .batch-info-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .batch-info-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+
+        .batch-info-table tfoot td {
+            font-weight: bold;
+            border-top: 2px solid #ddd;
+        }
+
+    .warning-message {
+        color: #FF8C00;
+        margin-top: 16px;
+        font-size: 14px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+</style>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; } = false;
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public int OrderId { get; set; }
+    [Parameter] public int LineNumber { get; set; }
+    [Parameter] public string ItemCode { get; set; }
+    [Parameter] public int Quantity { get; set; }
+
+    private List<AssignedBatch> AssignedBatches { get; set; } = new List<AssignedBatch>();
+    private bool IsLoading { get; set; } = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen && !string.IsNullOrEmpty(ItemCode))
+        {
+            await LoadBatchAssignments();
+        }
+    }
+
+    private async Task LoadBatchAssignments()
+    {
+        try
+        {
+            IsLoading = true;
+            StateHasChanged();
+
+            Console.WriteLine($"Cargando lotes para DocEntry={OrderId}, LineNumber={LineNumber}");
+
+            // 1. Obtener TODOS los lotes para este DocEntry sin ningún filtro adicional
+            var todosLosLotes = _sqlManagement.GetBatchesDirectFromDatabase(OrderId, LineNumber);
+
+            if (todosLosLotes.Any())
+            {
+                Console.WriteLine($"Se encontraron {todosLosLotes.Count} lotes para DocEntry {OrderId}");
+
+                // 2. Ahora sí, filtrar por LineNum
+                // IMPORTANTE: LineNumber en la UI es LineNum+1, así que necesitamos restar 1
+                var filtrados = todosLosLotes.Where(b => b.LineNum == LineNumber - 1).ToList();
+
+                if (filtrados.Any())
+                {
+                    Console.WriteLine($"Se filtraron {filtrados.Count} lotes para LineNum={LineNumber - 1}");
+                    AssignedBatches = filtrados;
+                }
+                else
+                {
+                    // Si no hay resultados con LineNumber-1, usar LineNum directamente para probar
+                    Console.WriteLine($"Probando con LineNum={LineNumber} directamente (sin restar 1)");
+                    filtrados = todosLosLotes.Where(b => b.LineNum == LineNumber).ToList();
+
+                    if (filtrados.Any())
+                    {
+                        Console.WriteLine($"Se encontraron {filtrados.Count} lotes usando LineNum={LineNumber}");
+                        AssignedBatches = filtrados;
+                    }
+                    else
+                    {
+                        // Si sigue sin haber resultados, devolver todos los lotes sin filtrar
+                        Console.WriteLine("No se encontraron lotes para ningún valor de LineNum, devolviendo todos los lotes");
+                        AssignedBatches = todosLosLotes;
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine($"No se encontraron lotes para DocEntry {OrderId}");
+                AssignedBatches = new List<AssignedBatch>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+            AssignedBatches = new List<AssignedBatch>();
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CloseDialog()
+    {
+        await IsOpenChanged.InvokeAsync(false);
+    }
+}

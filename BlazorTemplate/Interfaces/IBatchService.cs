@@ -39,6 +39,13 @@ namespace BlazorTemplate.Interfaces
         Task<bool> UpdateOrderErrorStatusAsync(int docEntry, string errorMessage);
         Task<string> GetOrderErrorMessageAsync(int docEntry);
 
+        // Método para guardar los lotes asignados en la tabla AssignedBatches
+        Task<bool> SaveAssignedBatchesToDatabaseAsync(int docEntry, List<LineItem> lineItems);
+
+        // Método para obtener los lotes asignados desde la base de datos
+        Task<List<AssignedBatch>> GetAssignedBatchesFromDatabaseAsync(int docEntry);
+
+
         // Inicializar datos de ejemplo para pruebas
         void InitializeTestData();
     }
