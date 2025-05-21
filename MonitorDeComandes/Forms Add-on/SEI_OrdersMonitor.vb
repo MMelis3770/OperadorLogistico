@@ -48,7 +48,7 @@ Public Class SEI_OrdersMonitor
             Me.Form.Visible = True
 
         Catch ex As Exception
-            SBO_Application.StatusBar.SetText("Error al cargar la pantalla ‘Monitor de Comandes’", SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
+            SBO_Application.StatusBar.SetText("Error loading the 'Order Monitor' screen", SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
             Me.Form.Close()
         End Try
     End Sub
@@ -74,7 +74,7 @@ Public Class SEI_OrdersMonitor
                 End Select
             End If
         Catch ex As Exception
-            SBO_Application.StatusBar.SetText($"Error en la pantalla: {ex.Message}", SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
+            SBO_Application.StatusBar.SetText($"Error in the screen: {ex.Message}", SAPbouiCOM.BoMessageTime.bmt_Short, SAPbouiCOM.BoStatusBarMessageType.smt_Error)
         End Try
     End Sub
     Public Overrides Sub HANDLE_MENU_EVENTS(ByRef pVal As SAPbouiCOM.MenuEvent, ByRef BubbleEvent As Boolean)
@@ -129,12 +129,10 @@ Public Class SEI_OrdersMonitor
         End If
     End Sub
 
-
     Private Sub HandleBtnSend(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
         If pVal.EventType <> BoEventTypes.et_ITEM_PRESSED Then Exit Sub
         If Not pVal.BeforeAction Then
             Try
-
                 Dim grid As SAPbouiCOM.Grid = Me.Form.Items.Item(FormControls.grid).Specific
                 Dim basePath As String = "C:\DataTXT\"
                 Dim isOrderSelected As Boolean = False
@@ -145,22 +143,9 @@ Public Class SEI_OrdersMonitor
 
                 For i As Integer = 0 To grid.Rows.Count - 1
                     Dim sendChecked As String = grid.DataTable.GetValue("Send", i).ToString()
-                    Dim docDueDate As DateTime = grid.DataTable.GetValue("DueDate", i)
-
-                    If sendChecked = "Y" AndAlso docDueDate >= Date.Today Then
+                    If sendChecked = "Y" Then
                         isOrderSelected = True
-                        Dim docEntry As Integer = grid.DataTable.GetValue("DocEntry", i)
-
-                        Dim order As Order = GetOrder(docEntry)
-                        If order Is Nothing Then
-                            Throw New Exception("Order not found")
-                        End If
-
-                        Dim filePath As String = $"{basePath}Order_{docEntry}_{DateTime.Now:yyyy_MM_dd_HH_mm_ss}.txt"
-                        GenerateOrderTxt(order, filePath)
-                        PatchStatus(docEntry, "Sent").Wait()
-                    ElseIf docDueDate < Date.Today Then
-                        SBO_Application.StatusBar.SetText("Cannot proceed: document due date is overdue.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                        Exit For
                     End If
                 Next
 
@@ -169,6 +154,38 @@ Public Class SEI_OrdersMonitor
                     Exit Sub
                 End If
 
+                For i As Integer = 0 To grid.Rows.Count - 1
+                    Dim sendChecked As String = grid.DataTable.GetValue("Send", i).ToString()
+                    Dim docDueDate As DateTime = grid.DataTable.GetValue("DueDate", i)
+                    Dim orderStatus As String = grid.DataTable.GetValue("OrderStatus", i).ToString()
+
+                    If sendChecked <> "Y" Then Continue For
+
+                    'If docDueDate < Date.Today Then
+                    '    SBO_Application.StatusBar.SetText("Cannot send: document due date is overdue.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                    '    Continue For
+                    'End If
+
+                    If Not String.IsNullOrEmpty(orderStatus) Then
+                        SBO_Application.StatusBar.SetText($"Cannot send: order already has status '{orderStatus}'", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                        Continue For
+                    End If
+
+                    Dim docEntry As Integer = grid.DataTable.GetValue("DocEntry", i)
+
+                    Dim order As Order = GetOrder(docEntry)
+                    If order Is Nothing Then
+                        SBO_Application.StatusBar.SetText($"Order {docEntry} not found", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                        Continue For
+                    End If
+
+                    Dim filePath As String = $"{basePath}Order_{docEntry}_{DateTime.Now:yyyy_MM_dd_HH_mm_ss}.txt"
+                    GenerateOrderTxt(order, filePath)
+                    PatchStatus(docEntry, "Sent").Wait()
+
+                    SBO_Application.StatusBar.SetText($"Order #{docEntry} sent successfully.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
+                Next
+
                 LoadOrdersDataInGridWithFiltration()
 
             Catch ex As Exception
@@ -176,7 +193,6 @@ Public Class SEI_OrdersMonitor
                 BubbleEvent = False
             End Try
         End If
-
     End Sub
 
     Private Sub HandleBtnCreateDeliveries(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
@@ -220,6 +236,7 @@ Public Class SEI_OrdersMonitor
             End Try
         End If
     End Sub
+
     Private Sub HandleBtnCreateInvoices(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
         If pVal.EventType <> BoEventTypes.et_ITEM_PRESSED Then Exit Sub
         If Not pVal.BeforeAction Then
@@ -266,73 +283,9 @@ Public Class SEI_OrdersMonitor
         End If
     End Sub
 
-
 #End Region
 
 #Region "FUINCIONES GENERALES"
-
-    'Private Function CreateDeliveryObject(docEntry As Integer) As Delivery
-    '    Try
-    '        Dim response = Task.Run(Function() m_SBOAddon.oSLConnection.Request("CONFORDERS").Filter($"DocEntry eq {docEntry}").GetAsync(Of JArray)()).GetAwaiter().GetResult()
-    '        If response Is Nothing Then
-    '            Throw New Exception($"Order with DocEntry {docEntry} not found in CONFORDERS")
-    '        End If
-
-    '        Dim delivery As New Delivery()
-    '        delivery.DocEntry = CInt(response("DocEntry"))
-    '        delivery.CardCode = Task.Run(Function() GetOrderCardCode(CInt(response("DocNum")))).GetAwaiter().GetResult()
-    '        delivery.DocDate = DateTime.Now.ToString("yyyy-MM-dd")
-    '        delivery.DocDueDate = DateTime.Now.ToString("yyyy-MM-dd")
-    '        delivery.Comments = $"Delivery created from confirmed order #{response("DocNum")}"
-    '        delivery.WarehouseCode = "01"
-
-    '        Dim linesResponse = Task.Run(Function() m_SBOAddon.oSLConnection.Request("CONF_ORDERLINES").Filter($"DocEntry eq {docEntry}").GetAllAsync(Of JObject)()).GetAwaiter().GetResult()
-    '        If linesResponse Is Nothing OrElse linesResponse.Count = 0 Then
-    '            Throw New Exception($"No lines found for order {docEntry} in CONF_ORDERLINES")
-    '        End If
-
-    '        For Each lineData As JObject In linesResponse
-    '            If lineData("LineStatus").ToString() = "C" Then
-    '                Dim line As New DeliveryLines()
-    '                line.BaseEntry = CInt(response("DocNum"))
-    '                line.BaseLine = CInt(lineData("LineNum"))
-    '                line.ItemCode = lineData("ItemCode").ToString()
-    '                line.Quantity = CDbl(lineData("Quantity"))
-    '                If Not String.IsNullOrEmpty(lineData("LotNumber")?.ToString()) Then
-    '                    Dim batch As New BatchNumber()
-    '                    batch.BatchNumber = lineData("LotNumber").ToString()
-    '                    batch.Quantity = CDbl(lineData("Quantity"))
-    '                    line.BatchNumbers.Add(batch)
-    '                End If
-    '                delivery.DocumentLines.Add(line)
-    '            End If
-    '        Next
-
-    '        If delivery.DocumentLines.Count = 0 Then
-    '            Throw New Exception("No confirmed lines were found for delivery creation")
-    '        End If
-
-    '        Return delivery
-    '    Catch ex As Exception
-    '        SBO_Application.StatusBar.SetText($"Error creating delivery object from UDO: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-    '        Return Nothing
-    '    End Try
-    'End Function
-
-    Private Async Function GetOrderCardCode(docNum As Integer) As Task(Of String)
-        Try
-            Dim orderResponse = Await m_SBOAddon.oSLConnection.Request("Orders").Filter($"DocNum eq {docNum}").GetAsync(Of JObject)()
-
-            If orderResponse Is Nothing Then
-                Throw New Exception($"Original order with DocNum {docNum} not found")
-            End If
-
-            Return orderResponse("CardCode").ToString()
-        Catch ex As Exception
-            SBO_Application.StatusBar.SetText($"Error getting CardCode: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-            Return String.Empty
-        End Try
-    End Function
 
     Private Async Function PostDelivery(orders As List(Of Order)) As Task
         Try
@@ -341,7 +294,13 @@ Public Class SEI_OrdersMonitor
                     Dim completeOrder As Order = GetOrder(orderBasic.DocEntry)
 
                     If completeOrder Is Nothing OrElse completeOrder.DocumentLines Is Nothing OrElse completeOrder.DocumentLines.Count = 0 Then
-                        Throw New Exception($"No se pudo recuperar el pedido completo o no tiene líneas")
+                        Throw New Exception($"The full order could not be retrieved or it has no lines")
+                    End If
+
+                    Dim confirmedLines = GetConfirmedOrderLines(orderBasic.DocEntry)
+
+                    If confirmedLines Is Nothing OrElse confirmedLines.Count = 0 Then
+                        Throw New Exception($"No confirmed lines were found for order {orderBasic.DocEntry}")
                     End If
 
                     Dim delivery As New With {
@@ -350,18 +309,52 @@ Public Class SEI_OrdersMonitor
                     .DocDueDate = DateTime.Now.AddDays(30).ToString("yyyy-MM-dd"),
                     .Comments = $"Delivery created from order #{completeOrder.DocEntry}",
                     .DocumentLines = New List(Of Object)()
-                }
-
-                    For Each line In completeOrder.DocumentLines
-                        Dim deliveryLine = New With {
-                        .BaseEntry = completeOrder.DocEntry,
-                        .BaseLine = line.LineNum,
-                        .BaseType = 17,
-                        .ItemCode = line.ItemCode,
-                        .Quantity = line.Quantity
                     }
-                        delivery.DocumentLines.Add(deliveryLine)
+
+                    For Each orderLine In completeOrder.DocumentLines
+
+                        Dim confirmedLinesForOrderLine As New List(Of Object)
+
+                        For Each confirmedLine In confirmedLines
+                            If CInt(confirmedLine.U_LineNum) = orderLine.LineNum Then
+                                confirmedLinesForOrderLine.Add(confirmedLine)
+                            End If
+                        Next
+
+                        If confirmedLinesForOrderLine.Count > 0 Then
+                            Dim batchList As New List(Of Object)
+                            Dim totalConfirmedQuantity As Double = 0
+
+                            For Each confirmedLine In confirmedLinesForOrderLine
+                                Dim batchNumber As String = confirmedLine.U_Batch?.ToString()
+                                Dim quantity As Double = CDbl(confirmedLine.U_Quantity)
+
+                                If Not String.IsNullOrEmpty(batchNumber) Then
+                                    batchList.Add(New With {
+                                    .BatchNumber = batchNumber,
+                                    .Quantity = quantity
+                                })
+                                End If
+
+                                totalConfirmedQuantity += quantity
+                            Next
+
+                            Dim deliveryLine = New With {
+                            .BaseEntry = completeOrder.DocEntry,
+                            .BaseLine = orderLine.LineNum,
+                            .BaseType = 17,
+                            .ItemCode = orderLine.ItemCode,
+                            .Quantity = totalConfirmedQuantity,
+                            .BatchNumbers = batchList
+                        }
+
+                            delivery.DocumentLines.Add(deliveryLine)
+                        End If
                     Next
+
+                    If delivery.DocumentLines.Count = 0 Then
+                        Throw New Exception($"No confirmed lines were found to create the delivery for order {orderBasic.DocEntry}")
+                    End If
 
                     Await m_SBOAddon.oSLConnection.Request("DeliveryNotes").PostAsync(delivery)
 
@@ -371,32 +364,38 @@ Public Class SEI_OrdersMonitor
 
                 Catch ex As Exception
                     SBO_Application.StatusBar.SetText($"Error creating delivery for order #{orderBasic.DocEntry}: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                    LogDeliveryError(orderBasic.DocEntry, ex.Message)
+                    LogError(orderBasic.DocEntry, ex.Message)
                 End Try
             Next
         Catch ex As Exception
-            SBO_Application.StatusBar.SetText($"Error in CreateDeliveriesForOrders: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+            SBO_Application.StatusBar.SetText($"General error in PostDelivery: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
         End Try
     End Function
 
-    Private Sub LogDeliveryError(docEntry As Integer, errorMessage As String)
+    Private Function GetConfirmedOrderLines(orderId As Integer) As List(Of Object)
         Try
-            Dim userTable As SAPbobsCOM.UserTable = CType(SBO_Company.UserTables.Item("LogMonitorOrders"), SAPbobsCOM.UserTable)
+            Dim recordset As SAPbobsCOM.Recordset = CType(SBO_Company.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset), SAPbobsCOM.Recordset)
+            Dim query As String = $"SELECT U_LineNum, U_ItemCode, U_Quantity, U_Batch FROM [@CONFORDERLINES] WHERE U_OrderId = {orderId}"
 
-            userTable.UserFields.Fields.Item("U_DocEntry").Value = docEntry
-            userTable.UserFields.Fields.Item("U_Error").Value = errorMessage
+            recordset.DoQuery(query)
 
-            Dim result As Integer = userTable.Add()
-            If result <> 0 Then
-                Dim errMsg As String = ""
-                Dim errCode As Integer
-                SBO_Company.GetLastError(errCode, errMsg)
-                SBO_Application.StatusBar.SetText($"Failed to insert log: {errMsg}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-            End If
+            Dim confirmedLines As New List(Of Object)
+
+            While Not recordset.EoF
+                confirmedLines.Add(New With {
+                .U_LineNum = CInt(recordset.Fields.Item("U_LineNum").Value),
+                .U_ItemCode = recordset.Fields.Item("U_ItemCode").Value.ToString(),
+                .U_Quantity = CDbl(recordset.Fields.Item("U_Quantity").Value),
+                .U_Batch = recordset.Fields.Item("U_Batch").Value.ToString()
+            })
+                recordset.MoveNext()
+            End While
+
+            Return confirmedLines
         Catch ex As Exception
-            SBO_Application.StatusBar.SetText($"Exception logging error: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+            Throw New Exception($"Error getting confirmed lines: {ex.Message}")
         End Try
-    End Sub
+    End Function
 
     Private Async Function PostInvoice(orders As List(Of Order)) As Task
         Try
@@ -443,18 +442,17 @@ Public Class SEI_OrdersMonitor
 
                 Catch ex As Exception
                     SBO_Application.StatusBar.SetText($"Error creating invoice for  : {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                    LogInvoiceError(cardCode, ex.Message)
+                    LogError(cardCode, ex.Message)
 
                 End Try
             Next
-
 
         Catch ex As Exception
             SBO_Application.StatusBar.SetText($"Error in PostInvoice: {ex.Message}", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
         End Try
     End Function
 
-    Private Sub LogInvoiceError(cardCode As Integer, errorMessage As String)
+    Private Sub LogError(cardCode As Integer, errorMessage As String)
         Try
             Dim userTable As SAPbobsCOM.UserTable = CType(SBO_Company.UserTables.Item("LogMonitorOrders"), SAPbobsCOM.UserTable)
 
@@ -702,7 +700,6 @@ Public Class SEI_OrdersMonitor
     End Sub
     Private Sub LoadOrdersDataInGrid()
 
-
         Try
             Dim oCombo As SAPbouiCOM.ComboBox = CType(Me.Form.Items.Item("cbOrder").Specific, SAPbouiCOM.ComboBox)
             oCombo.Select("ALL", SAPbouiCOM.BoSearchKey.psk_ByValue)
@@ -902,41 +899,45 @@ Public Class SEI_OrdersMonitor
             Return Nothing
         End Try
 
-
-
-
     End Function
+
     Private Function GetOrder(docEntry As Integer) As Order
         Try
             Dim serviceLayer As SLConnection = m_SBOAddon.oSLConnection
-            Dim response = serviceLayer.Request($"Orders({docEntry})").GetAsync(Of JObject)().Result()
+            Dim response = serviceLayer.Request($"Orders({docEntry})?$expand=DocumentLines,DocumentLines/BatchNumbers").GetAsync(Of JObject)().Result()
 
-            If response Is Nothing OrElse response Is Nothing Then
+            If response Is Nothing Then
                 Return Nothing
             End If
 
             Dim order = New Order With {
-         .DocEntry = CInt(response("DocEntry")),
-         .CardCode = response("CardCode")?.ToString(),
-         .OrderDate = If(response("DocDate") IsNot Nothing,
-                       DateTime.Parse(response("DocDate").ToString()),
-                       DateTime.MinValue),
-         .DocDueDate = If(response("DocDueDate") IsNot Nothing,
-                        DateTime.Parse(response("DocDueDate").ToString()),
-                        DateTime.MinValue),
-         .DocumentLines = New List(Of OrderLines)()
-     }
+            .DocEntry = CInt(response("DocEntry")),
+            .CardCode = response("CardCode")?.ToString(),
+            .OrderDate = If(response("DocDate") IsNot Nothing, DateTime.Parse(response("DocDate").ToString()), DateTime.MinValue),
+            .DocDueDate = If(response("DocDueDate") IsNot Nothing, DateTime.Parse(response("DocDueDate").ToString()), DateTime.MinValue),
+            .DocumentLines = New List(Of OrderLines)()
+        }
 
             If response("DocumentLines") IsNot Nothing Then
                 For Each line In response("DocumentLines")
-                    order.DocumentLines.Add(New OrderLines With {
-                 .LineNum = CInt(line("LineNum")),
-                 .ItemCode = line("ItemCode")?.ToString(),
-                 .Quantity = CDbl(line("Quantity")),
-                 .DueDate = If(line("ShipDate") IsNot Nothing,
-                             DateTime.Parse(line("ShipDate").ToString()),
-                             DateTime.MinValue)
-             })
+                    Dim newLine As New OrderLines With {
+                    .LineNum = CInt(line("LineNum")),
+                    .ItemCode = line("ItemCode")?.ToString(),
+                    .Quantity = CDbl(line("Quantity")),
+                    .DueDate = If(line("ShipDate") IsNot Nothing, DateTime.Parse(line("ShipDate").ToString()), DateTime.MinValue),
+                    .BatchNumbers = New List(Of BatchNumber)()
+                }
+
+                    If line("BatchNumbers") IsNot Nothing Then
+                        For Each batch In line("BatchNumbers")
+                            newLine.BatchNumbers.Add(New BatchNumber With {
+                            .BatchNumber = batch("BatchNumber")?.ToString(),
+                            .Quantity = CDbl(batch("Quantity"))
+                        })
+                        Next
+                    End If
+
+                    order.DocumentLines.Add(newLine)
                 Next
             End If
 
@@ -944,10 +945,11 @@ Public Class SEI_OrdersMonitor
 
         Catch ex As Exception
             SBO_Application.StatusBar.SetText($"Error fetching order {docEntry}: {ex.Message}",
-                                     BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                                 BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
             Return Nothing
         End Try
     End Function
+
     Private Sub GenerateOrderTxt(order As Order, filePath As String)
         Try
             Using writer As New StreamWriter(filePath)
@@ -1014,19 +1016,23 @@ Public Class SEI_OrdersMonitor
                 grid.Columns.Item(uid).LinkedObjectType = SAPbobsCOM.BoObjectTypes.oInvoices
                 grid.Columns.Item(uid).Editable = False
             End If
+
             If (uid = "InvoiceDocNum") Then
                 grid.Columns.Item(uid).TitleObject.Caption = "Invoice DocNum"
                 grid.Columns.Item(uid).Editable = False
             End If
+
             If (uid = "Delivery") Then
                 grid.Columns.Item(uid).TitleObject.Caption = "Delivery"
                 grid.Columns.Item(uid).LinkedObjectType = SAPbobsCOM.BoObjectTypes.oDeliveryNotes
                 grid.Columns.Item(uid).Editable = False
             End If
+
             If (uid = "DeliveryDocNum") Then
                 grid.Columns.Item(uid).TitleObject.Caption = "Delivery DocNum"
                 grid.Columns.Item(uid).Editable = False
             End If
+
             If (uid = "Client") Then
                 grid.Columns.Item(uid).TitleObject.Caption = "Client"
                 grid.Columns.Item(uid).Editable = False
@@ -1046,13 +1052,12 @@ Public Class SEI_OrdersMonitor
                 grid.Columns.Item(uid).TitleObject.Caption = "Operator Status"
                 grid.Columns.Item(uid).Editable = False
             End If
+
         Next
 
         If grid.Columns.Count > 0 AndAlso grid.Columns.Item("Status") IsNot Nothing Then
             grid.Columns.Item("Status").Visible = False
         End If
-
-
 
         For i = 0 To grid.Rows.Count - 1
             Dim orderStatus As String = grid.DataTable.GetValue("OrderStatus", i)
@@ -1093,13 +1098,13 @@ Public Class SEI_OrdersMonitor
 
         Next
 
-
-
         grid.DataTable.LoadSerializedXML(SAPbouiCOM.BoDataTableXmlSelect.dxs_DataOnly, xmlDoc.ToString())
         grid.AutoResizeColumns()
+
     End Sub
 
 #End Region
+
 #End Region
 
 End Class
