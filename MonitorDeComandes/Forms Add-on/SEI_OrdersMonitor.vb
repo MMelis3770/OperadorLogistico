@@ -3,6 +3,7 @@ Imports System.IO
 Imports System.Linq
 Imports System.Threading.Tasks
 Imports System.Xml.Linq
+Imports CrystalDecisions.Shared.Json
 Imports Newtonsoft.Json.Linq
 Imports SAPbobsCOM
 Imports SAPbouiCOM
@@ -128,11 +129,11 @@ Public Class SEI_OrdersMonitor
             LoadOrdersDataInGridWithFiltration()
         End If
     End Sub
-
     Private Sub HandleBtnSend(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
         If pVal.EventType <> BoEventTypes.et_ITEM_PRESSED Then Exit Sub
         If Not pVal.BeforeAction Then
             Try
+
                 Dim grid As SAPbouiCOM.Grid = Me.Form.Items.Item(FormControls.grid).Specific
                 Dim basePath As String = "C:\DataTXT\"
                 Dim isOrderSelected As Boolean = False
@@ -143,48 +144,33 @@ Public Class SEI_OrdersMonitor
 
                 For i As Integer = 0 To grid.Rows.Count - 1
                     Dim sendChecked As String = grid.DataTable.GetValue("Send", i).ToString()
-                    If sendChecked = "Y" Then
+                    Dim docDueDate As DateTime = grid.DataTable.GetValue("DueDate", i)
+                    Dim orderStatus As String = grid.DataTable.GetValue("OrderStatus", i).ToString()
+
+                    If sendChecked = "Y" AndAlso docDueDate >= Date.Today And String.IsNullOrEmpty(orderStatus) Then
                         isOrderSelected = True
-                        Exit For
+                        Dim docEntry As Integer = grid.DataTable.GetValue("DocEntry", i)
+
+                        Dim order As Order = GetOrder(docEntry)
+                        If order Is Nothing Then
+                            Throw New Exception("Order not found")
+                        End If
+
+                        Dim filePath As String = $"{basePath}Order_{docEntry}_{DateTime.Now:yyyy_MM_dd_HH_mm_ss}.txt"
+                        GenerateOrderTxt(order, filePath)
+                        PatchStatus(docEntry, "Sent").Wait()
+                    ElseIf docDueDate < Date.Today Then
+                        SBO_Application.StatusBar.SetText("Cannot proceed: document due date is overdue.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                    ElseIf Not String.IsNullOrWhiteSpace(orderStatus) Then
+                        SBO_Application.StatusBar.SetText("Cannot proceed: the order is not pending.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                     End If
                 Next
+
 
                 If Not isOrderSelected Then
                     SBO_Application.StatusBar.SetText("No order selected. Please select at least one order to send.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                     Exit Sub
                 End If
-
-                For i As Integer = 0 To grid.Rows.Count - 1
-                    Dim sendChecked As String = grid.DataTable.GetValue("Send", i).ToString()
-                    Dim docDueDate As DateTime = grid.DataTable.GetValue("DueDate", i)
-                    Dim orderStatus As String = grid.DataTable.GetValue("OrderStatus", i).ToString()
-
-                    If sendChecked <> "Y" Then Continue For
-
-                    'If docDueDate < Date.Today Then
-                    '    SBO_Application.StatusBar.SetText("Cannot send: document due date is overdue.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                    '    Continue For
-                    'End If
-
-                    If Not String.IsNullOrEmpty(orderStatus) Then
-                        SBO_Application.StatusBar.SetText($"Cannot send: order already has status '{orderStatus}'", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                        Continue For
-                    End If
-
-                    Dim docEntry As Integer = grid.DataTable.GetValue("DocEntry", i)
-
-                    Dim order As Order = GetOrder(docEntry)
-                    If order Is Nothing Then
-                        SBO_Application.StatusBar.SetText($"Order {docEntry} not found", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                        Continue For
-                    End If
-
-                    Dim filePath As String = $"{basePath}Order_{docEntry}_{DateTime.Now:yyyy_MM_dd_HH_mm_ss}.txt"
-                    GenerateOrderTxt(order, filePath)
-                    PatchStatus(docEntry, "Sent").Wait()
-
-                    SBO_Application.StatusBar.SetText($"Order #{docEntry} sent successfully.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Success)
-                Next
 
                 LoadOrdersDataInGridWithFiltration()
 
@@ -193,6 +179,7 @@ Public Class SEI_OrdersMonitor
                 BubbleEvent = False
             End Try
         End If
+
     End Sub
 
     Private Sub HandleBtnCreateDeliveries(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
