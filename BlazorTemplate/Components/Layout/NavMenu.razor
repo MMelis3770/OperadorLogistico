@@ -2,7 +2,6 @@
     <input type="checkbox" title="Menu expand/collapse toggle" id="navmenu-toggle" class="navmenu-icon" />
     <nav class="sitenav" aria-labelledby="main-menu" onclick="document.getElementById('navmenu-toggle').click();">
         <FluentNavMenu Id="main-menu" Collapsible="true" Width="250" Title="Navigation menu" @bind-Expanded="expanded">
-
             <ExpanderContent>
                 @if (expanded)
                 {
@@ -13,13 +12,11 @@
                     <FluentIcon Value="@(new Icons.Regular.Size24.ArrowCircleRight())" Color="Color.Accent" />
                 }
             </ExpanderContent>
-
             <ChildContent>
-                <FluentNavLink Href="/" Match="NavLinkMatch.All" Icon="@(new Icons.Regular.Size24.BookInformation())" IconColor="Color.Accent">Información</FluentNavLink>
-                <FluentNavLink Href="/TestTemplate" Icon="@(new Icons.Regular.Size24.AppsList())">Comandas</FluentNavLink>
-                <FluentNavLink Href="/HistoricLayout" Icon="@(new Icons.Regular.Size24.AppsList())">Histórico Comandas</FluentNavLink>
+                <FluentNavLink Href="/" Match="NavLinkMatch.All" Icon="@(new Icons.Regular.Size24.AppsList())">Orders</FluentNavLink>
+                <FluentNavLink Href="/HistoricLayout" Icon="@(new Icons.Regular.Size24.BookInformation())">Historic</FluentNavLink>
+                <FluentNavLink Href="/ErrorLayout" Icon="@(new Icons.Regular.Size24.ErrorCircle())">Errors</FluentNavLink>
             </ChildContent>
-
         </FluentNavMenu>
     </nav>
 </div>

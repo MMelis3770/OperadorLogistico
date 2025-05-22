@@ -43,7 +43,7 @@
             <PropertyColumn Property="@(o => o.Client)" Sortable="true" />
             <PropertyColumn Property="@(o => o.Date)" Format="yyyy-MM-dd" Sortable="true" />
             <PropertyColumn Property="@(o => o.Expiration)" Format="yyyy-MM-dd" Sortable="true" />
-            <PropertyColumn Property="@(o => o.LineCount)" Title="Líneas" Sortable="true" />
+            <PropertyColumn Property="@(o => o.LineCount)" Title="Lines" Sortable="true" />
             <TemplateColumn Title="">
                 <ChildContent>
                     <button @onclick="@(() => HandleRowClick(context))"
@@ -80,9 +80,9 @@
     {
         <div class="detail-container">
             <FluentDataGrid Items="@selectedOrderItems" TGridItem="OrderLineItem" Class="detail-grid">
-                <PropertyColumn Property="@(li => li.LineNumber + 1)" Title="Línea" Sortable="true" />
-                <PropertyColumn Property="@(li => li.ItemCode)" Title="Artículo" Sortable="true" />
-                <PropertyColumn Property="@(li => li.Quantity)" Title="Cantidad" Sortable="true" />
+                <PropertyColumn Property="@(li => li.LineNumber + 1)" Title="Line" Sortable="true" />
+                <PropertyColumn Property="@(li => li.ItemCode)" Title="Item" Sortable="true" />
+                <PropertyColumn Property="@(li => li.Quantity)" Title="Quantity" Sortable="true" />
                 <TemplateColumn Title="Batch">
                     <ChildContent>
                         <div style="display: flex; align-items: center; gap: 4px;">
