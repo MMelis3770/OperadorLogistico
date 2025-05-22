@@ -159,9 +159,11 @@ Public Class SEI_OrdersMonitor
                         Dim filePath As String = $"{basePath}Order_{docEntry}_{DateTime.Now:yyyy_MM_dd_HH_mm_ss}.txt"
                         GenerateOrderTxt(order, filePath)
                         PatchStatus(docEntry, "Sent").Wait()
-                    ElseIf docDueDate < Date.Today Then
+                    ElseIf sendChecked = "Y" And docDueDate < Date.Today Then
+                        isOrderSelected = True
                         SBO_Application.StatusBar.SetText("Cannot proceed: document due date is overdue.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
-                    ElseIf Not String.IsNullOrWhiteSpace(orderStatus) Then
+                    ElseIf sendChecked = "Y" And Not String.IsNullOrWhiteSpace(orderStatus) Then
+                        isOrderSelected = True
                         SBO_Application.StatusBar.SetText("Cannot proceed: the order is not pending.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                     End If
                 Next
@@ -614,7 +616,7 @@ Public Class SEI_OrdersMonitor
                                                     FROM ORDR T0
                                                     LEFT JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
 									                INNER JOIN RDR1 R ON T0.DocEntry = R.DocEntry
-                                                    WHERE T0.DocStatus = 'O'
+                                                    WHERE T0.DocStatus = 'O' and T0.U_OrdersStatus is null
                                                     GROUP BY 
                                                         T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
                                                         T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName) AS AllData 
@@ -821,7 +823,7 @@ Public Class SEI_OrdersMonitor
                                                     FROM ORDR T0
                                                     LEFT JOIN OSLP T1 ON T0.SlpCode = T1.SlpCode
 									                INNER JOIN RDR1 R ON T0.DocEntry = R.DocEntry
-                                                    WHERE T0.DocStatus = 'O'
+                                                    WHERE T0.DocStatus = 'O' and T0.U_OrdersStatus is null
                                                     GROUP BY 
                                                         T0.DocEntry, T0.DocNum, T0.DocTotal, T1.SlpName, 
                                                         T0.DocDate, T0.DocDueDate, T0.CardCode, T0.CardName) AS AllData 
