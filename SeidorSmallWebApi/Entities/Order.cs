@@ -9,7 +9,7 @@
         public DateTime U_DocDueDate { get; set; }
         public string U_Status { get; set; }
         public string U_ErrorMsg { get; set; }
-        public List<OrderLine> CONF_ORDERLINESCollection { get; set; }
+        public List<OrderLine> CONFORDERLINESCollection { get; set; }
     }
     public class OrderLine
     {
