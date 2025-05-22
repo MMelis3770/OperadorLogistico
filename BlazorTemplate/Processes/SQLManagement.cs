@@ -503,6 +503,47 @@ ORDER BY o.DocEntry DESC";  // Ordenar por ID descendente para ver las más reci
             }
         }
 
+        // Método para obtener todas las órdenes desde la base de datos con errores
+        public List<OrderData> GetAllOrdersWithErrorsFromDatabase()
+        {
+            try
+            {
+                string query = @"
+SELECT o.DocEntry, o.CardCode, o.OrderDate, o.DocDueDate, o.IsProcessed, o.HasError, o.ErrorMessage,
+       COUNT(l.LineNum) as LineCount 
+FROM dbo.Orders o 
+LEFT JOIN dbo.OrderLines l ON o.DocEntry = l.DocEntry 
+WHERE o.HasError = 1
+GROUP BY o.DocEntry, o.CardCode, o.OrderDate, o.DocDueDate, o.IsProcessed, o.HasError, o.ErrorMessage
+ORDER BY o.DocEntry DESC";
+
+                var ordersWithCount = _connection.Query<OrderDataWithCount>(query);
+
+                List<OrderData> result = new List<OrderData>();
+
+                foreach (var item in ordersWithCount)
+                {
+                    result.Add(new OrderData
+                    {
+                        DocEntry = item.DocEntry,
+                        CardCode = item.CardCode,
+                        OrderDate = item.OrderDate,
+                        DocDueDate = item.DocDueDate,
+                        IsProcessed = item.IsProcessed,
+                        HasError = item.HasError,
+                        ErrorMessage = item.ErrorMessage,
+                        LineItems = new List<LineItem>() // Se llenarán si es necesario con GetOrderLinesFromDatabase
+                    });
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error getting all orders from database: {ex.Message}", ex);
+            }
+        }
+
         // Método para insertar asignaciones de batch cuando una orden es procesada
         public async Task<bool> SaveAssignedBatchesAsync(int docEntry, List<LineItem> lineItems)
         {
