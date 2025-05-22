@@ -241,10 +241,35 @@
             // NOVA FUNCIONALITAT: Validar stock per a cada línia
             _stockAvailabilityCache.Clear(); // Netejar cache anterior
 
+            bool anyStockIssue = false;
+            StringBuilder errorMessageBuilder = new StringBuilder();
+            errorMessageBuilder.AppendLine("Se han detectado problemas de stock en los siguientes artículos:");
+            errorMessageBuilder.AppendLine();
+
             foreach (var line in orderData.LineItems)
             {
-                var (hasSufficientStock, _) = await _batchService.ValidateStockAvailabilityAsync(line.ItemCode, line.Quantity);
+                var (hasSufficientStock, availableQuantity) = await _batchService.ValidateStockAvailabilityAsync(line.ItemCode, line.Quantity);
                 _stockAvailabilityCache[(selectedOrder.ID, line.LineNum)] = hasSufficientStock;
+
+                // Si hay un problema de stock, añadirlo al mensaje de error
+                if (!hasSufficientStock)
+                {
+                    anyStockIssue = true;
+                    errorMessageBuilder.AppendLine($"- Artículo: {line.ItemCode}, Requerido: {line.Quantity}, Disponible: {availableQuantity}, Diferencia: {line.Quantity - availableQuantity}");
+                }
+            }
+
+            // Si hay algún problema de stock, actualizar el estado de error de la orden
+            if (anyStockIssue)
+            {
+                try
+                {
+                    await _batchService.UpdateOrderErrorStatusAsync(selectedOrder.ID, errorMessageBuilder.ToString());
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error al actualizar estado de error: {ex.Message}");
+                }
             }
 
             // Convertir las líneas al formato para la grid
@@ -360,7 +385,6 @@
                 {
                     errorMessage.AppendLine("<br>");
                     errorMessage.AppendLine($"- {error}");
-
                 }
                 errorMessage.AppendLine("");
 
@@ -437,6 +461,62 @@
                 return;
             }
 
+            // Lista para almacenar órdenes cuyo estado no se pudo actualizar
+            List<int> failedStatusUpdates = new List<int>();
+
+            // NUEVO: Actualizar el estado de IsProcessed a 1 para todas las órdenes
+            foreach (var order in processedOrders)
+            {
+                try
+                {
+                    // Asumiendo que _batchService tiene acceso a SQLManagement o inyectarlo directamente
+                    bool updateSuccess = await _batchService.UpdateOrderProcessedStatusAsync(order.DocEntry);
+
+                    if (updateSuccess)
+                    {
+                        // Si la actualización del estado fue exitosa, guardar los lotes asignados
+                        try
+                        {
+                            bool batchesSaved = await _batchService.SaveAssignedBatchesToDatabaseAsync(order.DocEntry, order.LineItems);
+                            if (!batchesSaved)
+                            {
+                                Console.WriteLine($"Advertencia: No se pudieron guardar los lotes asignados para la orden {order.DocEntry}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error al guardar lotes asignados para orden {order.DocEntry}: {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+                        failedStatusUpdates.Add(order.DocEntry);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    failedStatusUpdates.Add(order.DocEntry);
+                    // Opcional: registrar el error
+                    Console.WriteLine($"Error al actualizar estado de orden {order.DocEntry}: {ex.Message}");
+                }
+            }
+
+            // Opcional: Mostrar advertencia si algunas órdenes no se actualizaron
+            if (failedStatusUpdates.Any())
+            {
+                var warningMessage = new StringBuilder();
+                warningMessage.AppendLine("No se pudo actualizar el estado de las siguientes comandas:");
+                warningMessage.AppendLine("");
+                foreach (var orderId in failedStatusUpdates)
+                {
+                    warningMessage.AppendLine($"- Comanda {orderId}");
+                }
+
+                await _dialogService.ShowWarningAsync(
+                    warningMessage.ToString(),
+                    "Advertencia");
+            }
+
             // Simulación de procesamiento con progreso
             int totalOrders = processedOrders.Count;
             for (int i = 0; i < totalOrders; i++)
@@ -445,7 +525,7 @@
                 await Task.Delay(500); // Simulación de procesamiento por orden
 
                 // Opcional: confirmar cada orden en SAP
-                bool sapResult = await _orderService.ConfirmOrderToSAP(order.DocEntry);
+                bool sapResult = await _orderService.ConfirmOrderToSQL(order.DocEntry);
                 if (!sapResult)
                 {
                     await _dialogService.ShowWarningAsync($"Advertencia: La orden {order.DocEntry} no se pudo confirmar en SAP.", "Advertencia");
@@ -503,9 +583,7 @@
                     lineNumber = li.LineNum + 1,
                     itemCode = li.ItemCode,
                     quantity = li.Quantity,
-                    batch = li.Batch, // Esto incluirá los lotes asignados
-                                      // Opcional: información adicional de lotes
-                    batchDetails = !string.IsNullOrEmpty(li.Batch) ? li.Batch : "Sin lotes asignados"
+                    batch = li.Batch // Esto incluirá los lotes asignados
                 }).ToList()
             }).ToList();
 
@@ -535,17 +613,38 @@
 
         if (!hasSufficientStock)
         {
-            // Mostrar missatge d'error si no hi ha suficient stock
+            // Preparar el mensaje de error
             var message = $"No hi ha suficient stock disponible per al article {lineItem.ItemCode}.\n\n" +
                          $"Quantitat requerida: {lineItem.Quantity}\n" +
                          $"Quantitat disponible: {availableQuantity}\n" +
                          $"Diferència: {lineItem.Quantity - availableQuantity}";
 
+            try
+            {
+                bool updateResult = await _batchService.UpdateOrderErrorStatusAsync(selectedOrder.ID, message);
+
+                if (updateResult)
+                {
+                    // Opcional: indicar en el mensaje que se ha marcado la orden con error
+                    message += "\n\nLa comanda ha sido marcada con error.";
+                }
+                else
+                {
+                    Console.WriteLine($"No se pudo actualizar el estado de error para la orden {selectedOrder.ID}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al actualizar el estado de error: {ex.Message}");
+                // Continuamos con la visualización del mensaje de error aunque falle la actualización
+            }
+
+            // Mostrar el mensaje de error al usuario
             await _dialogService.ShowErrorAsync(message, "Stock Insuficient");
-            return; // No obrir el diàleg
+            return; // No abrir el diálogo
         }
 
-        // Si hi ha suficient stock, continuar amb l'assignació normal
+        // Si hay suficiente stock, continuar con la asignación normal
         currentOrderId = selectedOrder.ID;
         currentLineNumber = lineItem.LineNumber;
         currentItemCode = lineItem.ItemCode;
@@ -559,7 +658,6 @@
     private void OpenBatchInfoDialog(OrderLineItem lineItem)
     {
         if (lineItem == null || selectedOrder == null) return;
-        if (string.IsNullOrEmpty(lineItem.Batch)) return; // Solo mostrar información si hay lotes asignados
 
         currentOrderId = selectedOrder.ID;
         currentLineNumber = lineItem.LineNumber;
@@ -581,7 +679,13 @@
     private void HandleInfoDialogClosed(bool isOpen)
     {
         isInfoDialogOpen = isOpen;
-        StateHasChanged();
+
+        // Si se acaba de cerrar el diálogo, recargar la vista
+        if (!isOpen && selectedOrder != null)
+        {
+            // Forzar una actualización de la interfaz
+            InvokeAsync(StateHasChanged);
+        }
     }
 
     // Método para manejar la asignación exitosa de un batch
@@ -619,7 +723,7 @@
     {
         try
         {
-            bool result = await _orderService.ConfirmOrderToSAP(orderId);
+            bool result = await _orderService.ConfirmOrderToSQL(orderId);
 
             if (result)
             {

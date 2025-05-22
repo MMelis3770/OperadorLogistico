@@ -28,7 +28,7 @@ namespace BlazorTemplate.Services
                 throw;
             }
         }
-        public async Task<bool> ConfirmOrderToSAP(int orderId)
+        public async Task<bool> ConfirmOrderToSQL(int orderId)
         {
             try
             {

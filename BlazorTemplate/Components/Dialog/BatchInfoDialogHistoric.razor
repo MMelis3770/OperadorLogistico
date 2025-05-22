@@ -2,7 +2,9 @@
 @using BlazorTemplate.Interfaces
 @using Microsoft.FluentUI.AspNetCore.Components
 @using BlazorTemplate.Services
+@using BlazorTemplate.Processes
 @inject IBatchService _batchService
+@inject SQLManagement _sqlManagement
 
 @if (IsOpen)
 {
@@ -56,7 +58,7 @@
 
                     <FluentDivider Style="margin: 12px 0;" />
 
-                    @if (BatchAssignments?.Any() == true)
+                    @if (AssignedBatches?.Any() == true)
                     {
                         <h4>Lotes Asignados</h4>
                         <table class="batch-info-table">
@@ -67,27 +69,27 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var assignment in BatchAssignments)
+                                @foreach (var batch in AssignedBatches)
                                 {
                                     <tr>
-                                        <td>@assignment.BatchId</td>
-                                        <td>@assignment.Quantity</td>
+                                        <td>@batch.BatchNum</td>
+                                        <td>@batch.Quantity</td>
                                     </tr>
                                 }
                             </tbody>
                             <tfoot>
                                 <tr>
                                     <td><strong>Total</strong></td>
-                                    <td><strong>@BatchAssignments.Sum(a => a.Quantity)</strong></td>
+                                    <td><strong>@AssignedBatches.Sum(a => a.Quantity)</strong></td>
                                 </tr>
                             </tfoot>
                         </table>
 
-                        @if (BatchAssignments.Sum(a => a.Quantity) < Quantity)
+                        @if (AssignedBatches.Sum(a => a.Quantity) < Quantity)
                         {
                             <div class="warning-message">
                                 <FluentIcon Value="@(new Icons.Regular.Size16.Warning())" Color="Color.Warning" />
-                                <span>Atención: Solo se han asignado @BatchAssignments.Sum(a => a.Quantity) de @Quantity unidades.</span>
+                                <span>Atención: Solo se han asignado @AssignedBatches.Sum(a => a.Quantity) de @Quantity unidades.</span>
                             </div>
                         }
                     }
@@ -149,7 +151,7 @@
     [Parameter] public string ItemCode { get; set; }
     [Parameter] public int Quantity { get; set; }
 
-    private List<BatchAssignmentDialog.BatchAssignment> BatchAssignments { get; set; } = new List<BatchAssignmentDialog.BatchAssignment>();
+    private List<AssignedBatch> AssignedBatches { get; set; } = new List<AssignedBatch>();
     private bool IsLoading { get; set; } = false;
 
     protected override async Task OnParametersSetAsync()
@@ -167,12 +169,53 @@
             IsLoading = true;
             StateHasChanged();
 
-            // Cargar las asignaciones de batch para esta línea
-            BatchAssignments = await _batchService.GetBatchAssignmentsForOrderLineAsync(OrderId, LineNumber);
+            Console.WriteLine($"Cargando lotes para DocEntry={OrderId}, LineNumber={LineNumber}");
+
+            // 1. Obtener TODOS los lotes para este DocEntry sin ningún filtro adicional
+            var todosLosLotes = _sqlManagement.GetBatchesDirectFromDatabase(OrderId, LineNumber);
+
+            if (todosLosLotes.Any())
+            {
+                Console.WriteLine($"Se encontraron {todosLosLotes.Count} lotes para DocEntry {OrderId}");
+
+                // 2. Ahora sí, filtrar por LineNum
+                // IMPORTANTE: LineNumber en la UI es LineNum+1, así que necesitamos restar 1
+                var filtrados = todosLosLotes.Where(b => b.LineNum == LineNumber - 1).ToList();
+
+                if (filtrados.Any())
+                {
+                    Console.WriteLine($"Se filtraron {filtrados.Count} lotes para LineNum={LineNumber - 1}");
+                    AssignedBatches = filtrados;
+                }
+                else
+                {
+                    // Si no hay resultados con LineNumber-1, usar LineNum directamente para probar
+                    Console.WriteLine($"Probando con LineNum={LineNumber} directamente (sin restar 1)");
+                    filtrados = todosLosLotes.Where(b => b.LineNum == LineNumber).ToList();
+
+                    if (filtrados.Any())
+                    {
+                        Console.WriteLine($"Se encontraron {filtrados.Count} lotes usando LineNum={LineNumber}");
+                        AssignedBatches = filtrados;
+                    }
+                    else
+                    {
+                        // Si sigue sin haber resultados, devolver todos los lotes sin filtrar
+                        Console.WriteLine("No se encontraron lotes para ningún valor de LineNum, devolviendo todos los lotes");
+                        AssignedBatches = todosLosLotes;
+                    }
+                }
+            }
+            else
+            {
+                Console.WriteLine($"No se encontraron lotes para DocEntry {OrderId}");
+                AssignedBatches = new List<AssignedBatch>();
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error al cargar asignaciones: {ex.Message}");
+            Console.WriteLine($"Error: {ex.Message}");
+            AssignedBatches = new List<AssignedBatch>();
         }
         finally
         {

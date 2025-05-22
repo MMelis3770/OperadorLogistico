@@ -33,6 +33,18 @@ namespace BlazorTemplate.Interfaces
 
         // Verificar si hay suficientes cantidad para la línea
         Task<(bool HasSufficientStock, int AvailableQuantity)> ValidateStockAvailabilityAsync(string itemCode, int requiredQuantity);
+        
+        // Método para actualizar el estado de procesamiento de una orden
+        Task<bool> UpdateOrderProcessedStatusAsync(int docEntry);
+        Task<bool> UpdateOrderErrorStatusAsync(int docEntry, string errorMessage);
+        Task<string> GetOrderErrorMessageAsync(int docEntry);
+
+        // Método para guardar los lotes asignados en la tabla AssignedBatches
+        Task<bool> SaveAssignedBatchesToDatabaseAsync(int docEntry, List<LineItem> lineItems);
+
+        // Método para obtener los lotes asignados desde la base de datos
+        Task<List<AssignedBatch>> GetAssignedBatchesFromDatabaseAsync(int docEntry);
+
 
         // Inicializar datos de ejemplo para pruebas
         void InitializeTestData();

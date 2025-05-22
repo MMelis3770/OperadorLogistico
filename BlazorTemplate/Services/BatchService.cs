@@ -46,6 +46,37 @@ namespace BlazorTemplate.Services
             return result;
         }
 
+        // Método para actualizar el estado de procesamiento de una orden
+        public async Task<bool> UpdateOrderProcessedStatusAsync(int docEntry)
+        {
+            try
+            {
+                // Llama al método correspondiente en SQLManagement
+                return await _sqlManagement.UpdateOrderProcessedStatusAsync(docEntry);
+            }
+            catch (Exception ex)
+            {
+                // Log del error y re-lanzamiento
+                Console.WriteLine($"Error en BatchService.UpdateOrderProcessedStatusAsync: {ex.Message}");
+                throw;
+            }
+        }
+
+        public async Task<bool> UpdateOrderErrorStatusAsync(int docEntry, string errorMessage)
+        {
+            try
+            {
+                // Llama al método correspondiente en SQLManagement
+                return await _sqlManagement.UpdateOrderErrorStatusAsync(docEntry, errorMessage);
+            }
+            catch (Exception ex)
+            {
+                // Log del error y re-lanzamiento
+                Console.WriteLine($"Error en BatchService.UpdateOrderErrorStatusAsync: {ex.Message}");
+                throw;
+            }
+        }
+
         public async Task<bool> AssignBatchToOrderLineAsync(int orderId, int lineNumber, string batchId)
         {
             // Verificar que el batch existe en la base de datos
@@ -94,6 +125,20 @@ namespace BlazorTemplate.Services
             // Simular delay de proceso
             await Task.Delay(100);
             return true;
+        }
+
+        public async Task<List<AssignedBatch>> GetAssignedBatchesFromDatabaseAsync(int docEntry)
+        {
+            try
+            {
+                // Llamar al método correspondiente en SQLManagement
+                return await _sqlManagement.GetAssignedBatchesForOrderAsync(docEntry);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al obtener lotes asignados: {ex.Message}");
+                return new List<AssignedBatch>();
+            }
         }
 
         public async Task<string> GetAssignedBatchForOrderLineAsync(int orderId, int lineNumber)
@@ -190,28 +235,28 @@ namespace BlazorTemplate.Services
                 return false;
             }
 
-            // Solo verificar las cantidades si hay asignaciones
-            if (assignments.Any())
-            {
-                // Verificar que todos los batches existen en la base de datos
-                var allBatches = await GetAvailableBatchesAsync();
+            //// Solo verificar las cantidades si hay asignaciones
+            //if (assignments.Any())
+            //{
+            //    // Verificar que todos los batches existen en la base de datos
+            //    var allBatches = await GetAvailableBatchesAsync();
 
-                foreach (var assignment in assignments)
-                {
-                    var batch = allBatches.FirstOrDefault(b => b.BatchId == assignment.BatchId);
-                    if (batch == null)
-                    {
-                        return false;
-                    }
+            //    foreach (var assignment in assignments)
+            //    {
+            //        var batch = allBatches.FirstOrDefault(b => b.BatchId == assignment.BatchId);
+            //        if (batch == null)
+            //        {
+            //            return false;
+            //        }
 
-                    // Verificar la cantidad disponible (teniendo en cuenta las asignaciones actuales)
-                    int assignedToOthers = GetTotalAssignedToBatch(batch.BatchId, orderId, lineNumber);
-                    if (batch.AvailableQuantity + assignedToOthers < assignment.Quantity)
-                    {
-                        return false;
-                    }
-                }
-            }
+            //        // Verificar la cantidad disponible (teniendo en cuenta las asignaciones actuales)
+            //        int assignedToOthers = GetTotalAssignedToBatch(batch.BatchId, orderId, lineNumber);
+            //        if (batch.AvailableQuantity + assignedToOthers < assignment.Quantity)
+            //        {
+            //            return false;
+            //        }
+            //    }
+            //}
 
             // Guardar las asignaciones
             var key = (orderId, lineNumber);
@@ -246,19 +291,19 @@ namespace BlazorTemplate.Services
             return true;
         }
 
-        private int GetTotalAssignedToBatch(string batchId, int excludeOrderId = 0, int excludeLineNumber = 0)
+        public async Task<string> GetOrderErrorMessageAsync(int docEntry)
         {
-            int total = 0;
-            foreach (var kvp in _batchAssignments)
+            try
             {
-                // Excluir la línea específica si se indica
-                if (kvp.Key.OrderId == excludeOrderId && kvp.Key.LineNumber == excludeLineNumber)
-                    continue;
-
-                // Sumar las cantidades asignadas a este batch
-                total += kvp.Value.Where(a => a.BatchId == batchId).Sum(a => a.Quantity);
+                // Llama al método correspondiente en SQLManagement
+                return await _sqlManagement.GetOrderErrorMessageAsync(docEntry);
             }
-            return total;
+            catch (Exception ex)
+            {
+                // Log del error y re-lanzamiento
+                Console.WriteLine($"Error en BatchService.GetOrderErrorMessageAsync: {ex.Message}");
+                throw;
+            }
         }
 
         public async Task<bool> AllOrderLinesHaveBatchesAsync(int orderId)
@@ -303,6 +348,20 @@ namespace BlazorTemplate.Services
             {
                 // En cas d'error, assumim que no hi ha stock suficient
                 return (false, 0);
+            }
+        }
+
+        public async Task<bool> SaveAssignedBatchesToDatabaseAsync(int docEntry, List<LineItem> lineItems)
+        {
+            try
+            {
+                // Simplemente llama al método en SQLManagement
+                return await _sqlManagement.SaveAssignedBatchesAsync(docEntry, lineItems);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error al guardar lotes asignados: {ex.Message}");
+                return false;
             }
         }
 
