@@ -21,18 +21,18 @@
 <h1>Order Management</h1>
 
 <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
-    <FluentButton Appearance="Appearance.Accent" OnClick="@LoadOrdersFromFiles">Cargar Comandas</FluentButton>
+    <FluentButton Appearance="Appearance.Accent" OnClick="@LoadOrdersFromFiles">Load Orders</FluentButton>
     <FluentSpacer />
 
     <FluentButton Appearance="Appearance.Accent" Style="margin-right: 40px" BackgroundColor="#28a745"
     OnClick="@(async () => await NavigateToBatchWithSelected())">
-        Subir Comandas
+        Upload Orders
     </FluentButton>
 
     @if (isLoading)
     {
         <FluentProgressRing />
-        <span>Cargando comandas...</span>
+        <span>Loading orders...</span>
     }
 </FluentStack>
 
@@ -98,7 +98,7 @@
     else
     {
         <div class="alert alert-info" style="margin-top: 20px">
-            No hay líneas disponibles para esta comanda.
+            There are no lines available for this order.
         </div>
     }
 }
@@ -248,6 +248,11 @@
 
                         // 5. Generar el JSON para esta orden con error
                         string jsonForFailedOrder = ConvertOrdersToJson(new List<OrderData> { completeOrderData });
+
+                        var content = new StringContent(jsonForFailedOrder, Encoding.UTF8, "application/json");
+
+                        using var client = new HttpClient();
+                        var response = await client.PostAsync("http://localhost:8080/api/Order", content);
 
                         // 6. Añadir a la lista de órdenes con errores
                         ordersWithErrors.Add(completeOrderData);
@@ -452,7 +457,7 @@
     {
         try
         {
-            var currentDate = DateTime.Now;
+            var currentDate = DateTime.Now.Date;
             return currentDate >= orderDate && currentDate <= docDueDate;
         }
         catch (Exception ex)
