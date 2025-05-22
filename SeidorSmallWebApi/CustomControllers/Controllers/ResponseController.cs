@@ -20,21 +20,57 @@ public class OrderController : ControllerBase
     }
     [AllowAnonymous]
     [HttpPost]
-    public async Task<IActionResult> ReceiveOrder([FromBody] Order[] orderRequests)
+    public async Task<IActionResult> ReceiveOrder([FromBody] RecivedOrder[] IncomingOrderRequests)
     {
+        if (IncomingOrderRequests == null || IncomingOrderRequests.Length == 0)
+            return BadRequest("Order data is required");
+        List<Order> orders = new List<Order>();
+        foreach (RecivedOrder request in IncomingOrderRequests)
+        {
+            Order order = new Order();
+            order.U_OrderId = request.id;
+            order.U_CardCode = request.client;
+            order.U_DocDate = request.orderDate;
+            order.U_DocDueDate = request.dueDate;
+            if (request.hasError == 0 || request.hasError == null)
+            {
+                order.U_Status = "C";
+            }
+            else
+            {
+                order.U_Status = "R";
+                order.U_ErrorMsg = request.errorMessage;
+            }
+            int LineNum = 0;
+            order.CONFORDERLINESCollection = new List<OrderLine>();
+            foreach (RecivedOrderLines lines in request.lines)
+            {
+                OrderLine line = new OrderLine();
+                line.U_OrderId = request.id;
+                line.U_LineNum = LineNum;
+                LineNum++;
+                line.U_ItemCode = lines.itemCode;
+                line.U_Quantity = lines.quantity;
+                if (request.hasError == 0 || request.hasError == null)
+                {
+                    line.U_Batch = lines.batch;
+                }
+                order.CONFORDERLINESCollection.Add(line);
+            }
+            orders.Add(order);
+        }
         try
         {
-            if (orderRequests == null || orderRequests.Length == 0)
-                return BadRequest("Order data is required");
 
-            foreach (var orderRequest in orderRequests)
+
+            foreach (var orderRequest in orders)
             {
-                if (orderRequest.CONF_ORDERLINESCollection == null || !orderRequest.CONF_ORDERLINESCollection.Any())
+                if (orderRequest.CONFORDERLINESCollection == null || !orderRequest.CONFORDERLINESCollection.Any())
                     return BadRequest("Each order must have at least 1 line item");
 
                 try
                 {
-                    await _slConnection.Request("CONF_ORDERS").PostAsync(orderRequest);
+                    await _slConnection.Request("CONFORDERS").PostAsync(orderRequest);
                 }
                 catch (Exception ex)
                 {
@@ -45,8 +81,8 @@ public class OrderController : ControllerBase
 
             return Ok(new
             {
-                message = $"S'han processat {orderRequests.Length} comandes amb èxit.",
-                orders = orderRequests.Select(o => o.U_OrderId).ToArray()
+                message = $"S'han processat {orders.Count()} comandes amb èxit.",
+                orders = orders.Select(o => o.U_OrderId).ToArray()
             });
         }
         catch (Exception ex)
