@@ -225,7 +225,6 @@
                     {
                         string errorMessage = errorMessageBuilder.ToString();
                         await _batchService.UpdateOrderErrorStatusAsync(orderData.DocEntry, errorMessage);
-                        ordersWithErrors.Add(orderData);
                         errorDetails[orderData.DocEntry] = errorMessage;
 
                         var updatedOrder = sqlManagement.GetOrderWithErrorInfoFromDB(orderData.DocEntry);
@@ -256,7 +255,6 @@
 
                         // 6. Añadir a la lista de órdenes con errores
                         ordersWithErrors.Add(completeOrderData);
-                        errorDetails[completeOrderData.DocEntry] = errorMessage;
 
                         // Opcional: registrar el JSON en la consola
                         Console.WriteLine($"JSON para orden con error {completeOrderData.DocEntry}:");
