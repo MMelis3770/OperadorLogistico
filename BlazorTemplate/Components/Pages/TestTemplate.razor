@@ -25,7 +25,7 @@
     <FluentSpacer />
 
     <FluentButton Appearance="Appearance.Accent" Style="margin-right: 40px" BackgroundColor="#28a745"
-    OnClick="@(async () => await NavigateToBatchWithSelected())">
+                  OnClick="@(async () => await NavigateToBatchWithSelected())">
         Upload Orders
     </FluentButton>
 
@@ -36,9 +36,9 @@
     }
 </FluentStack>
 
-<!-- Contenedor principal -->
+<!-- Main container -->
 <div class="grid-and-pagination-container">
-    <!-- Contenedor del grid -->
+    <!-- Grid container -->
     <div class="fixed-height-grid-container">
         <FluentDataGrid Items="@orders" TGridItem="Order" Pagination="@pagination" Class="fixed-row-grid">
 
@@ -50,7 +50,7 @@
             <TemplateColumn Title="">
                 <ChildContent>
                     <button @onclick="@(() => HandleRowClick(context))"
-                    style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; display: flex; justify-content: center; align-items: center;">
+                            style="background: none; border: none; padding: 0; margin: 0; cursor: pointer; display: flex; justify-content: center; align-items: center;">
                         <FluentIcon Value="@(new Icons.Regular.Size20.Eye())" Color="Color.Accent" />
                     </button>
                 </ChildContent>
@@ -72,7 +72,7 @@
         </FluentDataGrid>
     </div>
 
-    <!-- Contenedor para el contador y paginador -->
+    <!-- Container for counter and paginator -->
     <div class="paginator-container">
         <div class="left-section"></div>
         <div class="right-section">
@@ -83,7 +83,7 @@
 
 @if (selectedOrder != null)
 {
-    <h2>Detalle de Comanda: @selectedOrder.ID - @selectedOrder.Client</h2>
+    <h2>Order Detail: @selectedOrder.ID - @selectedOrder.Client</h2>
 
     @if (selectedOrderItems != null && selectedOrderItems.Any())
     {
@@ -122,13 +122,14 @@
     {
         base.OnInitialized();
 
-        // Limpiar órdenes seleccionadas anteriores al cargar esta página
+        // Clear previously selected orders when loading this page
         _selectedOrdersService.ClearSelectedOrders();
         ChargeInitialOrders();
     }
 
     // Method to charge initial valid orders
-    public async void ChargeInitialOrders(){
+    public async void ChargeInitialOrders()
+    {
         await LoadOrdersFromSQL();
     }
 
@@ -152,10 +153,10 @@
         StateHasChanged();
     }
 
-    // Método para navegar a LayoutBatch con las órdenes seleccionadas
+    // Method to navigate to LayoutBatch with selected orders
     private async Task NavigateToBatchWithSelected()
     {
-        // Obtener IDs de órdenes seleccionadas
+        // Get IDs of selected orders
         var selectedOrderIds = checkedOrders
             .Where(kvp => kvp.Value && kvp.Key > 0)
             .Select(kvp => kvp.Key)
@@ -163,7 +164,7 @@
 
         if (selectedOrderIds.Count == 0)
         {
-            await _dialogService.ShowInfoAsync("No hay comandas seleccionadas", "Información");
+            await _dialogService.ShowInfoAsync("No orders selected", "Information");
             return;
         }
 
@@ -172,21 +173,21 @@
             isLoading = true;
             StateHasChanged();
 
-            // Obtener las OrderData completas desde la base de datos
+            // Get complete OrderData from the database
             var selectedOrdersData = new List<OrderData>();
             var ordersWithErrors = new List<OrderData>();
             var errorDetails = new Dictionary<int, string>();
 
             foreach (var orderId in selectedOrderIds)
             {
-                // Obtener la orden desde la base de datos
+                // Get order from database
                 var order = sqlManagement.GetOrdersFromDatabase().FirstOrDefault(o => o.DocEntry == orderId);
                 if (order != null)
                 {
-                    // Obtener las líneas de la orden
+                    // Get order lines
                     var lineItems = sqlManagement.GetOrderLinesFromDatabase(orderId);
 
-                    // Crear OrderData usando tu modelo actual
+                    // Create OrderData using your current model
                     var orderData = new OrderData
                         {
                             DocEntry = order.DocEntry,
@@ -199,14 +200,14 @@
                                 LineNum = li.LineNum,
                                 ItemCode = li.ItemCode,
                                 Quantity = li.Quantity,
-                                Batch = null // El batch será asignado en LayoutBatch
+                                Batch = null // Batch will be assigned in LayoutBatch
                             }).ToList()
                         };
 
-                    // Verificar stock disponible para cada línea
+                    // Check available stock for each line
                     bool hasStockIssue = false;
                     StringBuilder errorMessageBuilder = new StringBuilder();
-                    errorMessageBuilder.AppendLine($"Problemas de stock en comanda {order.DocEntry}:");
+                    errorMessageBuilder.AppendLine($"Stock issues in order {order.DocEntry}:");
                     errorMessageBuilder.AppendLine();
 
                     foreach (var line in orderData.LineItems)
@@ -216,11 +217,11 @@
                         if (!hasSufficientStock)
                         {
                             hasStockIssue = true;
-                            errorMessageBuilder.AppendLine($"- Artículo: {line.ItemCode}, Requerido: {line.Quantity}, Disponible: {availableQuantity}, Diferencia: {line.Quantity - availableQuantity}");
+                            errorMessageBuilder.AppendLine($"- Item: {line.ItemCode}, Required: {line.Quantity}, Available: {availableQuantity}, Difference: {line.Quantity - availableQuantity}");
                         }
                     }
 
-                    // Si la orden tiene problemas de stock, marcarla con error
+                    // If order has stock issues, mark it with error
                     if (hasStockIssue)
                     {
                         string errorMessage = errorMessageBuilder.ToString();
@@ -229,10 +230,10 @@
 
                         var updatedOrder = sqlManagement.GetOrderWithErrorInfoFromDB(orderData.DocEntry);
 
-                        // 3. Obtener las líneas actualizadas de la orden
+                        // 3. Get updated order lines
                         var lineItem = sqlManagement.GetOrderLinesFromDatabase(orderData.DocEntry);
 
-                        // 4. Crear un objeto OrderData completo con todos los datos actualizados
+                        // 4. Create a complete OrderData object with all updated data
                         var completeOrderData = new OrderData
                             {
                                 DocEntry = updatedOrder.DocEntry,
@@ -245,7 +246,7 @@
                                 LineItems = lineItem
                             };
 
-                        // 5. Generar el JSON para esta orden con error
+                        // 5. Generate JSON for this order with error
                         string jsonForFailedOrder = ConvertOrdersToJson(new List<OrderData> { completeOrderData });
 
                         var content = new StringContent(jsonForFailedOrder, Encoding.UTF8, "application/json");
@@ -253,94 +254,94 @@
                         using var client = new HttpClient();
                         var response = await client.PostAsync("http://localhost:8080/api/Order", content);
 
-                        // 6. Añadir a la lista de órdenes con errores
+                        // 6. Add to list of orders with errors
                         ordersWithErrors.Add(completeOrderData);
 
-                        // Opcional: registrar el JSON en la consola
-                        Console.WriteLine($"JSON para orden con error {completeOrderData.DocEntry}:");
+                        // Optional: log JSON to console
+                        Console.WriteLine($"JSON for order with error {completeOrderData.DocEntry}:");
                         Console.WriteLine(jsonForFailedOrder);
                     }
                     else
                     {
-                        // Si no hay problemas de stock, agregarla a las órdenes seleccionadas
+                        // If no stock issues, add to selected orders
                         selectedOrdersData.Add(orderData);
                     }
                 }
             }
 
-            // Desactivar indicador de carga
+            // Disable loading indicator
             isLoading = false;
             StateHasChanged();
 
-            // Manejo de casos de error
+            // Error case handling
             if (selectedOrderIds.Count == 1 && ordersWithErrors.Count == 1)
             {
-                // Si solo hay una orden seleccionada y tiene error, mostrar mensaje y no navegar
+                // If only one order selected and it has error, show message and don't navigate
                 var errorOrder = ordersWithErrors[0];
                 var errorMessage = errorDetails[errorOrder.DocEntry];
 
-                await _dialogService.ShowErrorAsync(errorMessage, $"Error de Stock en Comanda {errorOrder.DocEntry}");
-                // No navegar después de mostrar el error
+                await _dialogService.ShowErrorAsync(errorMessage, $"Stock Error in Order {errorOrder.DocEntry}");
+                // Don't navigate after showing error
                 await LoadOrdersFromSQL();
 
                 return;
             }
             else if (ordersWithErrors.Count > 0 && selectedOrdersData.Count == 0)
             {
-                // Si todas las órdenes tienen error, mostrar mensaje y no navegar
+                // If all orders have errors, show message and don't navigate
                 var errorMessage = new StringBuilder();
-                errorMessage.AppendLine("Todas las comandas seleccionadas tienen problemas de stock:");
+                errorMessage.AppendLine("All selected orders have stock issues:");
                 errorMessage.AppendLine();
 
                 foreach (var errorOrder in ordersWithErrors)
                 {
-                    errorMessage.AppendLine($"- Comanda {errorOrder.DocEntry}: ");
+                    errorMessage.AppendLine($"- Order {errorOrder.DocEntry}: ");
                     errorMessage.AppendLine(errorDetails[errorOrder.DocEntry]);
                     errorMessage.AppendLine();
                 }
 
-                await _dialogService.ShowErrorAsync(errorMessage.ToString(), "Error de Stock");
+                await _dialogService.ShowErrorAsync(errorMessage.ToString(), "Stock Error");
                 await LoadOrdersFromSQL();
 
                 return;
             }
             else if (ordersWithErrors.Count > 0 && selectedOrdersData.Count > 0)
             {
-                // Usar formato HTML para el mensaje
+                // Use HTML format for the message
                 var errorMessage = new StringBuilder();
                 errorMessage.Append("<div style='margin-bottom: 15px;'>");
-                errorMessage.Append("Algunas comandas tienen problemas de stock y no serán procesadas:");
+                errorMessage.Append("Some orders have stock issues and will not be processed:");
                 errorMessage.Append("</div>");
 
                 foreach (var errorOrder in ordersWithErrors)
                 {
                     errorMessage.Append($"<div style='margin-top: 15px; margin-bottom: 10px;'>");
-                    errorMessage.Append($"<b>- Comanda {errorOrder.DocEntry}:</b>");
+                    errorMessage.Append($"<b>- Order {errorOrder.DocEntry}:</b>");
                     errorMessage.Append("</div>");
 
-                    // Convertir los detalles del error a HTML
+                    // Convert error details to HTML
                     string htmlErrorDetails = errorDetails[errorOrder.DocEntry]
                         .Replace("\n", "<br/>")
-                        .Replace("- Artículo:", "<div style='margin-top: 8px; margin-bottom: 5px;'><b>- Artículo:</b>")
-                        .Replace("Requerido:", "<b>Requerido:</b>")
-                        .Replace("Disponible:", "<b>Disponible:</b>")
-                        .Replace("Diferencia:", "<b>Diferencia:</b></div>");
+                        .Replace("- Item:", "<div style='margin-top: 8px; margin-bottom: 5px;'><b>- Item:</b>")
+                        .Replace("Required:", "<b>Required:</b>")
+                        .Replace("Available:", "<b>Available:</b>")
+                        .Replace("Difference:", "<b>Difference:</b></div>");
 
                     errorMessage.Append(htmlErrorDetails);
                 }
 
                 errorMessage.Append("<div style='margin-top: 25px; margin-bottom: 15px;'>");
-                errorMessage.Append($"<b>Se procederá con las {selectedOrdersData.Count} comandas restantes que no tienen errores.</b>");
+                errorMessage.Append($"<b>Will proceed with the remaining {selectedOrdersData.Count} orders that have no errors.</b>");
                 errorMessage.Append("</div>");
 
-                // Guardar órdenes válidas
+                // Save valid orders
                 _selectedOrdersService.SetSelectedOrders(selectedOrdersData);
 
-                // Mostrar el diálogo y esperar que se cierre
-                var dialog = await _dialogService.ShowInfoAsync(errorMessage.ToString(), "Comandas con Problemas de Stock");
+                // Show dialog and wait for it to close
+                var dialog = await _dialogService.ShowInfoAsync(errorMessage.ToString(), "Orders with Stock Issues");
                 await dialog.Result;
 
-                // Solo después de que se presiona "OK" o se cierra el diálogo
+                // Only after "OK" is pressed or dialog is closed
                 _navigationManager.NavigateTo("/LayoutBatch");
 
 
@@ -349,41 +350,41 @@
 
             if (selectedOrdersData.Count == 0)
             {
-                await _dialogService.ShowErrorAsync("No se pudieron cargar las órdenes seleccionadas", "Error");
+                await _dialogService.ShowErrorAsync("Could not load selected orders", "Error");
                 return;
             }
 
-            // Si llegamos aquí, todas las órdenes son válidas
-            Console.WriteLine($"Cargando {selectedOrdersData.Count} órdenes al servicio");
+            // If we get here, all orders are valid
+            Console.WriteLine($"Loading {selectedOrdersData.Count} orders to service");
             _selectedOrdersService.SetSelectedOrders(selectedOrdersData);
 
-            // Navegar a la página de Batch
+            // Navigate to Batch page
             _navigationManager.NavigateTo("/LayoutBatch");
         }
         catch (Exception ex)
         {
             isLoading = false;
             StateHasChanged();
-            await _dialogService.ShowErrorAsync($"Error al preparar órdenes para batch: {ex.Message}", "Error");
-            Console.WriteLine($"Error completo: {ex}");
+            await _dialogService.ShowErrorAsync($"Error preparing orders for batch: {ex.Message}", "Error");
+            Console.WriteLine($"Complete error: {ex}");
         }
     }
 
-    // Método auxiliar para convertir las órdenes a formato JSON
+    // Helper method to convert orders to JSON format
     private string ConvertOrdersToJson(List<OrderData> orders)
     {
         try
         {
-            // Crear un objeto anónimo que represente las órdenes en el formato deseado para la API
+            // Create an anonymous object that represents the orders in the desired format for the API
             var apiOrders = orders.Select(o => new
             {
                 id = o.DocEntry,
                 client = o.CardCode,
                 orderDate = o.OrderDate.ToString("yyyy-MM-dd"),
                 dueDate = o.DocDueDate.ToString("yyyy-MM-dd"),
-                isProcessed = o.IsProcessed, // Añadido campo IsProcessed
-                hasError = o.HasError,       // Añadido campo HasError
-                errorMessage = o.ErrorMessage, // Añadido campo ErrorMessage
+                isProcessed = o.IsProcessed, // Added IsProcessed field
+                hasError = o.HasError,       // Added HasError field
+                errorMessage = o.ErrorMessage, // Added ErrorMessage field
                 lines = o.LineItems.Select(li => new
                 {
                     lineNumber = li.LineNum + 1,
@@ -392,7 +393,7 @@
                 }).ToList()
             }).ToList();
 
-            // Serializar a JSON con formato indentado para mejor visualización
+            // Serialize to JSON with indented format for better visualization
             var options = new System.Text.Json.JsonSerializerOptions
                 {
                     WriteIndented = true,
@@ -403,8 +404,8 @@
         }
         catch (Exception ex)
         {
-            // En caso de error, devolver mensaje de error como JSON
-            return $"{{ \"error\": \"Error al generar JSON: {ex.Message}\" }}";
+            // In case of error, return error message as JSON
+            return $"{{ \"error\": \"Error generating JSON: {ex.Message}\" }}";
         }
     }
 
@@ -417,14 +418,14 @@
             var orderDate = order.OrderDate;
             var docDueDate = order.DocDueDate;
 
-            // Validar que la fecha sea valida (fecha current entre OrderDate y DocDueDate)
+            // Validate that the date is valid (current date between OrderDate and DocDueDate)
             if (!ValidateOrderDate(orderDate, docDueDate))
             {
                 throw new Exception($"Order {order.DocEntry} is not valid for the current date. " +
                                               $"Current date must be between {orderDate:yyyy-MM-dd} and {docDueDate:yyyy-MM-dd}, the end date has to be at least 4 days later than the current date");
             }
 
-            // Validar si el cliente existe en la BBDD
+            // Validate if the client exists in the database
             if (!sqlManagement.ValidateActiveClients(cardCode))
             {
                 throw new Exception($"Client {cardCode} does not exist in the database");
@@ -432,13 +433,13 @@
 
             foreach (var line in order.LineItems)
             {
-                // Validar si el item existe en la BBDD
+                // Validate if the item exists in the database
                 if (!sqlManagement.GetItems(line.ItemCode))
                 {
                     throw new Exception($"Item {line.ItemCode} does not exist in the database");
                 }
 
-                // Validar si hay batches suficientes para los items
+                // Validate if there are sufficient batches for the items
                 // if (!sqlManagement.GetBatches(line.ItemCode))
                 // {
                 //     throw new Exception($"Item {line.ItemCode} does not have any available batch");
@@ -475,23 +476,23 @@
             isLoading = true;
             StateHasChanged();
 
-            // Usar OrderService para obtener órdenes desde archivos TXT
+            // Use OrderService to get orders from TXT files
             processedOrders = await _orderService.GetOrdersAsync();
 
-            // Validar órdenes antes de cargarlas a SQL
+            // Validate orders before loading them to SQL
             ValidateOrdersBeforeSQL(processedOrders);
 
-            // Cargar las órdenes en la base de datos SQL
+            // Load orders into SQL database
             sqlManagement.LoadOrdersToSQL(processedOrders);
 
-            // Obtener las órdenes desde la base de datos SQL
+            // Get orders from SQL database
             await LoadOrdersFromSQL();
 
-            await _dialogService.ShowInfoAsync($"Se han cargado {processedOrders.Count} comandas a la base de datos.", "Información");
+            await _dialogService.ShowInfoAsync($"{processedOrders.Count} orders have been loaded into the database.", "Information");
         }
         catch (Exception ex)
         {
-            await _dialogService.ShowErrorAsync($"Error al cargar comandas: {ex.Message}", "Error");
+            await _dialogService.ShowErrorAsync($"Error loading orders: {ex.Message}", "Error");
         }
         finally
         {
@@ -504,54 +505,54 @@
     {
         try
         {
-            // Obtener órdenes desde la base de datos
+            // Get orders from database
             var sqlOrders = sqlManagement.GetOrdersFromDatabase();
 
-            // Convertir a formato para la grid
+            // Convert to format for the grid
             var orderList = sqlOrders.Select(o => new Order(
                 o.DocEntry,
                 o.CardCode,
                 DateOnly.FromDateTime(o.OrderDate),
                 DateOnly.FromDateTime(o.DocDueDate),
-                sqlManagement.GetOrderLinesFromDatabase(o.DocEntry).Count  // Obtener el número real de líneas
+                sqlManagement.GetOrderLinesFromDatabase(o.DocEntry).Count  // Get the real number of lines
             )).ToList();
 
             orders = orderList.AsQueryable();
 
-            // Inicializar estado de checkboxes
+            // Initialize checkbox state
             checkedOrders.Clear();
             foreach (var order in orderList.Where(o => o.ID > 0))
             {
                 checkedOrders[order.ID] = false;
             }
 
-            // Limpiar la selección actual si existe
+            // Clear current selection if it exists
             selectedOrder = null;
             selectedOrderItems = null;
         }
         catch (Exception ex)
         {
-            throw new Exception($"Error al cargar órdenes desde SQL: {ex.Message}", ex);
+            throw new Exception($"Error loading orders from SQL: {ex.Message}", ex);
         }
     }
 
     private void HandleRowClick(Order order)
     {
-        if (order == null || order.ID <= 0) return;  // Ignorar clics en filas vacías (ID ≤ 0)
+        if (order == null || order.ID <= 0) return;  // Ignore clicks on empty rows (ID ≤ 0)
 
         selectedOrder = order;
-        StateHasChanged(); // Forzar actualización para mostrar el encabezado de la sección de detalles
+        StateHasChanged(); // Force update to show the detail section header
 
         try
         {
-            // Obtener las líneas de la orden desde SQL
+            // Get order lines from SQL
             var lineItemsFromDB = sqlManagement.GetOrderLinesFromDatabase(selectedOrder.ID);
 
-            Console.WriteLine($"Líneas recuperadas para orden {selectedOrder.ID}: {lineItemsFromDB.Count}");
+            Console.WriteLine($"Lines retrieved for order {selectedOrder.ID}: {lineItemsFromDB.Count}");
 
             if (lineItemsFromDB != null && lineItemsFromDB.Any())
             {
-                // Convertir las líneas al formato para la grid
+                // Convert lines to format for the grid
                 var lineItems = lineItemsFromDB
                     .Select(li => new OrderLineItem(
                         li.LineNum,
@@ -564,18 +565,18 @@
             }
             else
             {
-                // Si no se encuentran líneas, mostrar una colección vacía
+                // If no lines found, show empty collection
                 selectedOrderItems = Array.Empty<OrderLineItem>().AsQueryable();
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error al obtener líneas para orden {order.ID}: {ex.Message}");
-            // Si ocurre un error, mostrar una colección vacía
+            Console.WriteLine($"Error getting lines for order {order.ID}: {ex.Message}");
+            // If an error occurs, show empty collection
             selectedOrderItems = Array.Empty<OrderLineItem>().AsQueryable();
         }
 
-        // Segunda llamada a StateHasChanged para actualizar la grid de líneas
+        // Second call to StateHasChanged to update the lines grid
         StateHasChanged();
     }
 
@@ -587,16 +588,16 @@
 
             if (result)
             {
-                await _dialogService.ShowInfoAsync($"Orden {orderId} confirmada en SAP con éxito.", "Confirmación");
+                await _dialogService.ShowInfoAsync($"Order {orderId} confirmed in SAP successfully.", "Confirmation");
             }
             else
             {
-                await _dialogService.ShowErrorAsync($"No se pudo confirmar la orden {orderId} en SAP.", "Error");
+                await _dialogService.ShowErrorAsync($"Could not confirm order {orderId} in SAP.", "Error");
             }
         }
         catch (Exception ex)
         {
-            await _dialogService.ShowErrorAsync($"Error al confirmar la orden en SAP: {ex.Message}", "Error");
+            await _dialogService.ShowErrorAsync($"Error confirming order in SAP: {ex.Message}", "Error");
         }
     }
 

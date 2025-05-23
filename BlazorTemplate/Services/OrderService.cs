@@ -1,17 +1,20 @@
 ﻿using BlazorTemplate.Interfaces;
 using BlazorTemplate.Models;
 using Microsoft.Extensions.Logging;
+
 namespace BlazorTemplate.Services
 {
     public class OrderService : IOrderService
     {
         private readonly ILogger<OrderService> _logger;
         private readonly string _orderFilesPath;
+
         public OrderService(ILogger<OrderService> logger, string orderFilesPath)
         {
             _logger = logger;
             _orderFilesPath = orderFilesPath;
         }
+
         public async Task<List<OrderData>> GetOrdersAsync()
         {
             try
@@ -28,6 +31,7 @@ namespace BlazorTemplate.Services
                 throw;
             }
         }
+
         public async Task<bool> ConfirmOrderToSQL(int orderId)
         {
             try

@@ -7,46 +7,45 @@ namespace BlazorTemplate.Interfaces
 {
     public interface IBatchService
     {
-        // Obtener todos los batches disponibles
+        // Get all available batches
         Task<List<Batch>> GetAvailableBatchesAsync();
 
-        // Obtener batches disponibles para un artículo específico
+        // Get available batches for a specific item
         Task<List<Batch>> GetAvailableBatchesForItemAsync(string itemCode);
 
-        // Asignar un batch a una línea de orden (todo el lote)
+        // Assign a batch to an order line (entire batch)
         Task<bool> AssignBatchToOrderLineAsync(int orderId, int lineNumber, string batchId);
 
-        // Obtener el batch asignado a una línea de orden (para compatibilidad)
+        // Get the assigned batch for an order line (for compatibility)
         Task<string> GetAssignedBatchForOrderLineAsync(int orderId, int lineNumber);
 
-        // Obtener todas las asignaciones de batch para una línea de orden
+        // Get all batch assignments for an order line
         Task<List<BatchAssignment>> GetBatchAssignmentsForOrderLineAsync(int orderId, int lineNumber);
 
-        // Guardar asignaciones de batch para una línea de orden
+        // Save batch assignments for an order line
         Task<bool> SaveBatchAssignmentsForOrderLineAsync(int orderId, int lineNumber, List<BatchAssignment> assignments);
 
-        // Verificar si todas las líneas de una orden tienen batches asignados
+        // Check if all order lines have assigned batches
         Task<bool> AllOrderLinesHaveBatchesAsync(int orderId);
 
-        // Asignar automáticamente batches a líneas sin asignar
+        // Automatically assign batches to unassigned lines
         Task<bool> AutoAssignBatchesToOrderAsync(int orderId);
 
-        // Verificar si hay suficientes cantidad para la línea
+        // Check if there is sufficient quantity for the line
         Task<(bool HasSufficientStock, int AvailableQuantity)> ValidateStockAvailabilityAsync(string itemCode, int requiredQuantity);
-        
-        // Método para actualizar el estado de procesamiento de una orden
+
+        // Method to update the processing status of an order
         Task<bool> UpdateOrderProcessedStatusAsync(int docEntry);
         Task<bool> UpdateOrderErrorStatusAsync(int docEntry, string errorMessage);
         Task<string> GetOrderErrorMessageAsync(int docEntry);
 
-        // Método para guardar los lotes asignados en la tabla AssignedBatches
+        // Method to save assigned batches in the AssignedBatches table
         Task<bool> SaveAssignedBatchesToDatabaseAsync(int docEntry, List<LineItem> lineItems);
 
-        // Método para obtener los lotes asignados desde la base de datos
+        // Method to get assigned batches from the database
         Task<List<AssignedBatch>> GetAssignedBatchesFromDatabaseAsync(int docEntry);
 
-
-        // Inicializar datos de ejemplo para pruebas
+        // Initialize sample data for testing
         void InitializeTestData();
     }
 }

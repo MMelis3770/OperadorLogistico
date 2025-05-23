@@ -18,27 +18,27 @@ namespace BlazorTemplate.Services
             _batchAssignments = new Dictionary<(int OrderId, int LineNumber), List<BatchAssignment>>();
         }
 
-        // Implementar el método InitializeTestData() aunque no lo usemos
+        // Implement the InitializeTestData() method even though we don't use it
         public void InitializeTestData()
         {
         }
 
         public async Task<List<Batch>> GetAvailableBatchesAsync()
         {
-            // Obtenir tots els batches de la base de dades
+            // Get all batches from the database
             var batches = await _sqlManagement.GetAllBatchesAsync();
 
-            // Filtrar només els batches actius
+            // Filter only active batches
             var result = batches.Where(b => b.IsActive).ToList();
             return result;
         }
 
         public async Task<List<Batch>> GetAvailableBatchesForItemAsync(string itemCode)
         {
-            // Obtenir batches específics per a un ItemCode des de la base de dades
+            // Get specific batches for an ItemCode from the database
             var batches = await _sqlManagement.GetBatchesForItemAsync(itemCode);
 
-            // Filtrar només els batches actius amb quantitat disponible
+            // Filter only active batches with available quantity
             var result = batches
                 .Where(b => b.IsActive && b.AvailableQuantity > 0)
                 .ToList();
@@ -46,18 +46,18 @@ namespace BlazorTemplate.Services
             return result;
         }
 
-        // Método para actualizar el estado de procesamiento de una orden
+        // Method to update the processing status of an order
         public async Task<bool> UpdateOrderProcessedStatusAsync(int docEntry)
         {
             try
             {
-                // Llama al método correspondiente en SQLManagement
+                // Call the corresponding method in SQLManagement
                 return await _sqlManagement.UpdateOrderProcessedStatusAsync(docEntry);
             }
             catch (Exception ex)
             {
-                // Log del error y re-lanzamiento
-                Console.WriteLine($"Error en BatchService.UpdateOrderProcessedStatusAsync: {ex.Message}");
+                // Log error and re-throw
+                Console.WriteLine($"Error in BatchService.UpdateOrderProcessedStatusAsync: {ex.Message}");
                 throw;
             }
         }
@@ -66,28 +66,28 @@ namespace BlazorTemplate.Services
         {
             try
             {
-                // Llama al método correspondiente en SQLManagement
+                // Call the corresponding method in SQLManagement
                 return await _sqlManagement.UpdateOrderErrorStatusAsync(docEntry, errorMessage);
             }
             catch (Exception ex)
             {
-                // Log del error y re-lanzamiento
-                Console.WriteLine($"Error en BatchService.UpdateOrderErrorStatusAsync: {ex.Message}");
+                // Log error and re-throw
+                Console.WriteLine($"Error in BatchService.UpdateOrderErrorStatusAsync: {ex.Message}");
                 throw;
             }
         }
 
         public async Task<bool> AssignBatchToOrderLineAsync(int orderId, int lineNumber, string batchId)
         {
-            // Verificar que el batch existe en la base de datos
-            var batches = await _sqlManagement.GetBatchesForItemAsync(null); // Obtener todos
+            // Verify that the batch exists in the database
+            var batches = await _sqlManagement.GetBatchesForItemAsync(null); // Get all
             var batch = batches.FirstOrDefault(b => b.BatchId == batchId);
             if (batch == null)
             {
                 return false;
             }
 
-            // Verificar que la orden y línea existen
+            // Verify that the order and line exist
             var orders = _selectedOrdersService.SelectedOrders;
             var order = orders.FirstOrDefault(o => o.DocEntry == orderId);
             if (order == null)
@@ -101,14 +101,14 @@ namespace BlazorTemplate.Services
                 return false;
             }
 
-            // Crear una asignación para toda la cantidad
+            // Create an assignment for the entire quantity
             var assignment = new BatchAssignment
             {
                 BatchId = batchId,
                 Quantity = line.Quantity
             };
 
-            // Guardar la asignación
+            // Save the assignment
             var key = (orderId, lineNumber);
             if (_batchAssignments.ContainsKey(key))
             {
@@ -119,10 +119,10 @@ namespace BlazorTemplate.Services
                 _batchAssignments.Add(key, new List<BatchAssignment> { assignment });
             }
 
-            // Actualizar la línea de orden con el batch asignado
+            // Update the order line with the assigned batch
             line.Batch = batchId;
 
-            // Simular delay de proceso
+            // Simulate process delay
             await Task.Delay(100);
             return true;
         }
@@ -131,12 +131,12 @@ namespace BlazorTemplate.Services
         {
             try
             {
-                // Llamar al método correspondiente en SQLManagement
+                // Call the corresponding method in SQLManagement
                 return await _sqlManagement.GetAssignedBatchesForOrderAsync(docEntry);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error al obtener lotes asignados: {ex.Message}");
+                Console.WriteLine($"Error getting assigned batches: {ex.Message}");
                 return new List<AssignedBatch>();
             }
         }
@@ -146,14 +146,14 @@ namespace BlazorTemplate.Services
             await Task.Delay(50);
             var key = (orderId, lineNumber);
 
-            // Si hay asignaciones parciales, devolver el primer batch (para compatibilidad)
+            // If there are partial assignments, return the first batch (for compatibility)
             if (_batchAssignments.TryGetValue(key, out var assignments) && assignments.Any())
             {
                 var batchId = assignments.First().BatchId;
                 return batchId;
             }
 
-            // Si no está en nuestro diccionario, verificar en la orden directamente
+            // If not in our dictionary, check directly in the order
             var orders = _selectedOrdersService.SelectedOrders;
             var order = orders.FirstOrDefault(o => o.DocEntry == orderId);
             if (order != null)
@@ -161,14 +161,14 @@ namespace BlazorTemplate.Services
                 var line = order.LineItems.FirstOrDefault(l => l.LineNum == lineNumber);
                 if (line != null && !string.IsNullOrEmpty(line.Batch))
                 {
-                    // Crear una asignación por defecto para toda la cantidad
+                    // Create a default assignment for the entire quantity
                     var assignment = new BatchAssignment
                     {
                         BatchId = line.Batch,
                         Quantity = line.Quantity
                     };
 
-                    // Sincronizar nuestro diccionario
+                    // Synchronize our dictionary
                     if (!_batchAssignments.ContainsKey(key))
                     {
                         _batchAssignments.Add(key, new List<BatchAssignment> { assignment });
@@ -185,13 +185,13 @@ namespace BlazorTemplate.Services
             await Task.Delay(50);
             var key = (orderId, lineNumber);
 
-            // Si hay asignaciones parciales, devolverlas
+            // If there are partial assignments, return them
             if (_batchAssignments.TryGetValue(key, out var assignments) && assignments.Any())
             {
                 return assignments;
             }
 
-            // Si no está en nuestro diccionario, verificar en la orden directamente
+            // If not in our dictionary, check directly in the order
             var orders = _selectedOrdersService.SelectedOrders;
             var order = orders.FirstOrDefault(o => o.DocEntry == orderId);
             if (order != null)
@@ -199,7 +199,7 @@ namespace BlazorTemplate.Services
                 var line = order.LineItems.FirstOrDefault(l => l.LineNum == lineNumber);
                 if (line != null && !string.IsNullOrEmpty(line.Batch))
                 {
-                    // Crear una asignación por defecto para toda la cantidad
+                    // Create a default assignment for the entire quantity
                     var assignment = new BatchAssignment
                     {
                         BatchId = line.Batch,
@@ -215,13 +215,13 @@ namespace BlazorTemplate.Services
 
         public async Task<bool> SaveBatchAssignmentsForOrderLineAsync(int orderId, int lineNumber, List<BatchAssignment> assignments)
         {
-            // El caso de asignaciones vacías ahora es aceptable
+            // The case of empty assignments is now acceptable
             if (assignments == null)
             {
-                assignments = new List<BatchAssignment>(); // Convertir a lista vacía en lugar de fallar
+                assignments = new List<BatchAssignment>(); // Convert to empty list instead of failing
             }
 
-            // Verificar que la orden y línea existen
+            // Verify that the order and line exist
             var orders = _selectedOrdersService.SelectedOrders;
             var order = orders.FirstOrDefault(o => o.DocEntry == orderId);
             if (order == null)
@@ -235,10 +235,10 @@ namespace BlazorTemplate.Services
                 return false;
             }
 
-            //// Solo verificar las cantidades si hay asignaciones
+            //// Only verify quantities if there are assignments
             //if (assignments.Any())
             //{
-            //    // Verificar que todos los batches existen en la base de datos
+            //    // Verify that all batches exist in the database
             //    var allBatches = await GetAvailableBatchesAsync();
 
             //    foreach (var assignment in assignments)
@@ -249,7 +249,7 @@ namespace BlazorTemplate.Services
             //            return false;
             //        }
 
-            //        // Verificar la cantidad disponible (teniendo en cuenta las asignaciones actuales)
+            //        // Verify available quantity (taking into account current assignments)
             //        int assignedToOthers = GetTotalAssignedToBatch(batch.BatchId, orderId, lineNumber);
             //        if (batch.AvailableQuantity + assignedToOthers < assignment.Quantity)
             //        {
@@ -258,7 +258,7 @@ namespace BlazorTemplate.Services
             //    }
             //}
 
-            // Guardar las asignaciones
+            // Save the assignments
             var key = (orderId, lineNumber);
             if (_batchAssignments.ContainsKey(key))
             {
@@ -269,24 +269,24 @@ namespace BlazorTemplate.Services
                 _batchAssignments.Add(key, new List<BatchAssignment>(assignments));
             }
 
-            // Actualizar la línea de orden con un resumen de los batches asignados
+            // Update the order line with a summary of assigned batches
             if (assignments.Count == 0)
             {
-                // Si no hay asignaciones, limpiar el campo de batch
+                // If there are no assignments, clear the batch field
                 line.Batch = string.Empty;
             }
             else if (assignments.Count == 1)
             {
-                // Si solo hay un batch, usamos ese como referencia principal
+                // If there's only one batch, use that as the main reference
                 line.Batch = assignments[0].BatchId;
             }
             else
             {
-                // Si hay múltiples batches, usar una referencia combinada
+                // If there are multiple batches, use a combined reference
                 line.Batch = string.Join(", ", assignments.Select(a => $"{a.BatchId} ({a.Quantity})"));
             }
 
-            // Simular delay de proceso
+            // Simulate process delay
             await Task.Delay(100);
             return true;
         }
@@ -295,13 +295,13 @@ namespace BlazorTemplate.Services
         {
             try
             {
-                // Llama al método correspondiente en SQLManagement
+                // Call the corresponding method in SQLManagement
                 return await _sqlManagement.GetOrderErrorMessageAsync(docEntry);
             }
             catch (Exception ex)
             {
-                // Log del error y re-lanzamiento
-                Console.WriteLine($"Error en BatchService.GetOrderErrorMessageAsync: {ex.Message}");
+                // Log error and re-throw
+                Console.WriteLine($"Error in BatchService.GetOrderErrorMessageAsync: {ex.Message}");
                 throw;
             }
         }
@@ -312,10 +312,10 @@ namespace BlazorTemplate.Services
             var order = orders.FirstOrDefault(o => o.DocEntry == orderId);
             if (order == null)
             {
-                return true; // No hay orden, no hay problema
+                return true; // No order, no problem
             }
 
-            // Verificar cada línea
+            // Verify each line
             foreach (var line in order.LineItems)
             {
                 var assignments = await GetBatchAssignmentsForOrderLineAsync(orderId, line.LineNum);
@@ -333,20 +333,20 @@ namespace BlazorTemplate.Services
         {
             try
             {
-                // Obtenir tots els batches disponibles per a aquest article
+                // Get all available batches for this item
                 var batches = await GetAvailableBatchesForItemAsync(itemCode);
 
-                // Calcular la quantitat total disponible
+                // Calculate total available quantity
                 int totalAvailable = batches.Sum(b => b.AvailableQuantity);
 
-                // Verificar si hi ha suficient stock
+                // Check if there's sufficient stock
                 bool hasSufficientStock = totalAvailable >= requiredQuantity;
 
                 return (hasSufficientStock, totalAvailable);
             }
             catch (Exception)
             {
-                // En cas d'error, assumim que no hi ha stock suficient
+                // In case of error, assume there's not enough stock
                 return (false, 0);
             }
         }
@@ -355,12 +355,12 @@ namespace BlazorTemplate.Services
         {
             try
             {
-                // Simplemente llama al método en SQLManagement
+                // Simply call the method in SQLManagement
                 return await _sqlManagement.SaveAssignedBatchesAsync(docEntry, lineItems);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error al guardar lotes asignados: {ex.Message}");
+                Console.WriteLine($"Error saving assigned batches: {ex.Message}");
                 return false;
             }
         }
@@ -382,12 +382,12 @@ namespace BlazorTemplate.Services
 
                 if (!hasSufficientStock)
                 {
-                    // Si no hi ha suficient stock, marcar com a no assignat i continuar amb la següent línia
+                    // If there's not enough stock, mark as not assigned and continue with the next line
                     allAssigned = false;
                     continue;
                 }
 
-                // Verificar si ja hay asignaciones
+                // Check if there are already assignments
                 var assignments = await GetBatchAssignmentsForOrderLineAsync(orderId, line.LineNum);
                 int totalAssigned = assignments.Sum(a => a.Quantity);
                 int pendingQuantity = line.Quantity - totalAssigned;
@@ -397,14 +397,14 @@ namespace BlazorTemplate.Services
                     continue;
                 }
 
-                // Buscar batches disponibles para este artículo desde la base de datos
+                // Look for available batches for this item from the database
                 var batches = await GetAvailableBatchesForItemAsync(line.ItemCode);
                 if (batches.Any())
                 {
-                    // Ordenar los batches por fecha de vencimiento (FEFO)
+                    // Sort batches by expiration date (FEFO)
                     batches = batches.OrderBy(b => b.EndDate).ToList();
 
-                    // Crear asignaciones para cubrir la cantidad pendiente
+                    // Create assignments to cover the pending quantity
                     List<BatchAssignment> newAssignments = new List<BatchAssignment>(assignments);
                     int remainingQuantity = pendingQuantity;
 
@@ -428,7 +428,7 @@ namespace BlazorTemplate.Services
 
                     if (remainingQuantity <= 0)
                     {
-                        // Guardar las asignaciones
+                        // Save the assignments
                         bool success = await SaveBatchAssignmentsForOrderLineAsync(orderId, line.LineNum, newAssignments);
                         if (!success)
                         {
@@ -442,7 +442,7 @@ namespace BlazorTemplate.Services
                 }
                 else
                 {
-                    // No hay batches disponibles
+                    // No available batches
                     allAssigned = false;
                 }
             }

@@ -10,7 +10,6 @@ namespace BlazorTemplate.Models
         public string ItemCode { get; set; }
         public int AvailableQuantity { get; set; }
 
-        // Propiedad calculada para determinar si el lote está activo
         public bool IsActive => DateTime.Now >= StartDate && DateTime.Now <= EndDate && AvailableQuantity > 0;
 
         public Batch()
@@ -26,7 +25,6 @@ namespace BlazorTemplate.Models
             AvailableQuantity = availableQuantity;
         }
 
-        // Para mostrar en la interfaz
         public string DisplayInfo => $"{BatchId} ({StartDate:yyyy-MM-dd} a {EndDate:yyyy-MM-dd}) - Disp: {AvailableQuantity}";
 
     }
