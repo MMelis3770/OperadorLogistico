@@ -559,7 +559,7 @@ Public Class SEI_OrdersMonitor
 										                T0.U_OrdersStatus AS OrderStatus,
 										                T4.U_Status AS OperatorStatus,
 										                CASE
-											                WHEN T0.U_OrdersStatus = 'Sent' THEN 'Sent'
+											                WHEN T0.U_OrdersStatus = 'Sent' and T4.U_Status is null THEN 'Sent'
 											                WHEN T2.DocEntry IS NOT NULL THEN 'Invoiced'
 											                WHEN D.DocEntry IS NOT NULL THEN 'Delivered'
 											                WHEN T4.U_Status = 'R' THEN 'Rejected'
@@ -766,7 +766,7 @@ Public Class SEI_OrdersMonitor
 										                T0.U_OrdersStatus AS OrderStatus,
 										                T4.U_Status AS OperatorStatus,
 										                CASE
-											                WHEN T0.U_OrdersStatus = 'Sent' THEN 'Sent'
+											                WHEN T0.U_OrdersStatus = 'Sent' and T4.U_Status is null THEN 'Sent'
 											                WHEN T2.DocEntry IS NOT NULL THEN 'Invoiced'
 											                WHEN D.DocEntry IS NOT NULL THEN 'Delivered'
 											                WHEN T4.U_Status = 'R' THEN 'Rejected'
