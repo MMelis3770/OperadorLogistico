@@ -10,7 +10,7 @@
         <FluentDialogHeader>
             <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
                 <FluentIcon Value="@(new Icons.Regular.Size24.SlideSearch())" Color="Color.Accent" />
-                <h3>Información de Lotes</h3>
+                <h3>Batch Information</h3>
             </FluentStack>
         </FluentDialogHeader>
         <FluentDialogBody>
@@ -18,7 +18,7 @@
             {
                 <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
                     <FluentProgressRing />
-                    <span>Cargando información de lotes...</span>
+                    <span>Loading batch information...</span>
                 </FluentStack>
             }
             else
@@ -26,28 +26,28 @@
                 <FluentStack Orientation="Orientation.Vertical" VerticalGap="12">
                     <FluentGrid Columns="2" ColumnGap="16" RowGap="12">
                         <FluentGridItem>
-                            <FluentLabel>Orden:</FluentLabel>
+                            <FluentLabel>Order:</FluentLabel>
                         </FluentGridItem>
                         <FluentGridItem>
                             <span>@OrderId</span>
                         </FluentGridItem>
 
                         <FluentGridItem>
-                            <FluentLabel>Línea:</FluentLabel>
+                            <FluentLabel>Line:</FluentLabel>
                         </FluentGridItem>
                         <FluentGridItem>
                             <span>@(LineNumber + 1)</span>
                         </FluentGridItem>
 
                         <FluentGridItem>
-                            <FluentLabel>Artículo:</FluentLabel>
+                            <FluentLabel>Item:</FluentLabel>
                         </FluentGridItem>
                         <FluentGridItem>
                             <span>@ItemCode</span>
                         </FluentGridItem>
 
                         <FluentGridItem>
-                            <FluentLabel>Cantidad Total:</FluentLabel>
+                            <FluentLabel>Total Quantity:</FluentLabel>
                         </FluentGridItem>
                         <FluentGridItem>
                             <span>@Quantity</span>
@@ -58,12 +58,12 @@
 
                     @if (BatchAssignments?.Any() == true)
                     {
-                        <h4>Lotes Asignados</h4>
+                        <h4>Assigned Batches</h4>
                         <table class="batch-info-table">
                             <thead>
                                 <tr>
-                                    <th>Lote</th>
-                                    <th>Cantidad</th>
+                                    <th>Batch</th>
+                                    <th>Quantity</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -87,7 +87,7 @@
                         {
                             <div class="warning-message">
                                 <FluentIcon Value="@(new Icons.Regular.Size16.Warning())" Color="Color.Warning" />
-                                <span>Atención: Solo se han asignado @BatchAssignments.Sum(a => a.Quantity) de @Quantity unidades.</span>
+                                <span>Warning: Only @BatchAssignments.Sum(a => a.Quantity) of @Quantity units have been assigned.</span>
                             </div>
                         }
                     }
@@ -95,14 +95,14 @@
                     {
                         <div class="warning-message">
                             <FluentIcon Value="@(new Icons.Regular.Size16.Warning())" Color="Color.Warning" />
-                            <span>Este artículo no tiene lotes asignados.</span>
+                            <span>This item has no assigned batches.</span>
                         </div>
                     }
                 </FluentStack>
             }
         </FluentDialogBody>
         <FluentDialogFooter>
-            <FluentButton Appearance="Appearance.Accent" OnClick="@CloseDialog">Cerrar</FluentButton>
+            <FluentButton Appearance="Appearance.Accent" OnClick="@CloseDialog">Close</FluentButton>
         </FluentDialogFooter>
     </FluentDialog>
 }
@@ -167,12 +167,12 @@
             IsLoading = true;
             StateHasChanged();
 
-            // Cargar las asignaciones de batch para esta línea
+            // Load batch assignments for this line
             BatchAssignments = await _batchService.GetBatchAssignmentsForOrderLineAsync(OrderId, LineNumber);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error al cargar asignaciones: {ex.Message}");
+            Console.WriteLine($"Error loading assignments: {ex.Message}");
         }
         finally
         {

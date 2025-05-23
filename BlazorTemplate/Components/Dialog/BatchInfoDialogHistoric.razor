@@ -12,7 +12,7 @@
         <FluentDialogHeader>
             <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
                 <FluentIcon Value="@(new Icons.Regular.Size24.SlideSearch())" Color="Color.Accent" />
-                <h3>Información de Lotes</h3>
+                <h3>Batch Information</h3>
             </FluentStack>
         </FluentDialogHeader>
         <FluentDialogBody>
@@ -20,7 +20,7 @@
             {
                 <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="8">
                     <FluentProgressRing />
-                    <span>Cargando información de lotes...</span>
+                    <span>Loading batch information...</span>
                 </FluentStack>
             }
             else
@@ -28,28 +28,28 @@
                 <FluentStack Orientation="Orientation.Vertical" VerticalGap="12">
                     <FluentGrid Columns="2" ColumnGap="16" RowGap="12">
                         <FluentGridItem>
-                            <FluentLabel>Orden:</FluentLabel>
+                            <FluentLabel>Order:</FluentLabel>
                         </FluentGridItem>
                         <FluentGridItem>
                             <span>@OrderId</span>
                         </FluentGridItem>
 
                         <FluentGridItem>
-                            <FluentLabel>Línea:</FluentLabel>
+                            <FluentLabel>Line:</FluentLabel>
                         </FluentGridItem>
                         <FluentGridItem>
                             <span>@(LineNumber + 1)</span>
                         </FluentGridItem>
 
                         <FluentGridItem>
-                            <FluentLabel>Artículo:</FluentLabel>
+                            <FluentLabel>Item:</FluentLabel>
                         </FluentGridItem>
                         <FluentGridItem>
                             <span>@ItemCode</span>
                         </FluentGridItem>
 
                         <FluentGridItem>
-                            <FluentLabel>Cantidad Total:</FluentLabel>
+                            <FluentLabel>Total Quantity:</FluentLabel>
                         </FluentGridItem>
                         <FluentGridItem>
                             <span>@Quantity</span>
@@ -60,12 +60,12 @@
 
                     @if (AssignedBatches?.Any() == true)
                     {
-                        <h4>Lotes Asignados</h4>
+                        <h4>Assigned Batches</h4>
                         <table class="batch-info-table">
                             <thead>
                                 <tr>
-                                    <th>Lote</th>
-                                    <th>Cantidad</th>
+                                    <th>Batch</th>
+                                    <th>Quantity</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -89,7 +89,7 @@
                         {
                             <div class="warning-message">
                                 <FluentIcon Value="@(new Icons.Regular.Size16.Warning())" Color="Color.Warning" />
-                                <span>Atención: Solo se han asignado @AssignedBatches.Sum(a => a.Quantity) de @Quantity unidades.</span>
+                                <span>Warning: Only @AssignedBatches.Sum(a => a.Quantity) of @Quantity units have been assigned.</span>
                             </div>
                         }
                     }
@@ -97,14 +97,14 @@
                     {
                         <div class="warning-message">
                             <FluentIcon Value="@(new Icons.Regular.Size16.Warning())" Color="Color.Warning" />
-                            <span>Este artículo no tiene lotes asignados.</span>
+                            <span>This item has no assigned batches.</span>
                         </div>
                     }
                 </FluentStack>
             }
         </FluentDialogBody>
         <FluentDialogFooter>
-            <FluentButton Appearance="Appearance.Accent" OnClick="@CloseDialog">Cerrar</FluentButton>
+            <FluentButton Appearance="Appearance.Accent" OnClick="@CloseDialog">Close</FluentButton>
         </FluentDialogFooter>
     </FluentDialog>
 }
@@ -169,46 +169,46 @@
             IsLoading = true;
             StateHasChanged();
 
-            Console.WriteLine($"Cargando lotes para DocEntry={OrderId}, LineNumber={LineNumber}");
+            Console.WriteLine($"Loading batches for DocEntry={OrderId}, LineNumber={LineNumber}");
 
-            // 1. Obtener TODOS los lotes para este DocEntry sin ningún filtro adicional
-            var todosLosLotes = _sqlManagement.GetBatchesDirectFromDatabase(OrderId, LineNumber);
+            // 1. Get ALL batches for this DocEntry without any additional filters
+            var allBatches = _sqlManagement.GetBatchesDirectFromDatabase(OrderId, LineNumber);
 
-            if (todosLosLotes.Any())
+            if (allBatches.Any())
             {
-                Console.WriteLine($"Se encontraron {todosLosLotes.Count} lotes para DocEntry {OrderId}");
+                Console.WriteLine($"Found {allBatches.Count} batches for DocEntry {OrderId}");
 
-                // 2. Ahora sí, filtrar por LineNum
-                // IMPORTANTE: LineNumber en la UI es LineNum+1, así que necesitamos restar 1
-                var filtrados = todosLosLotes.Where(b => b.LineNum == LineNumber - 1).ToList();
+                // 2. Now filter by LineNum
+                // IMPORTANT: LineNumber in the UI is LineNum+1, so we need to subtract 1
+                var filtered = allBatches.Where(b => b.LineNum == LineNumber - 1).ToList();
 
-                if (filtrados.Any())
+                if (filtered.Any())
                 {
-                    Console.WriteLine($"Se filtraron {filtrados.Count} lotes para LineNum={LineNumber - 1}");
-                    AssignedBatches = filtrados;
+                    Console.WriteLine($"Filtered {filtered.Count} batches for LineNum={LineNumber - 1}");
+                    AssignedBatches = filtered;
                 }
                 else
                 {
-                    // Si no hay resultados con LineNumber-1, usar LineNum directamente para probar
-                    Console.WriteLine($"Probando con LineNum={LineNumber} directamente (sin restar 1)");
-                    filtrados = todosLosLotes.Where(b => b.LineNum == LineNumber).ToList();
+                    // If there are no results with LineNumber-1, use LineNum directly to test
+                    Console.WriteLine($"Testing with LineNum={LineNumber} directly (without subtracting 1)");
+                    filtered = allBatches.Where(b => b.LineNum == LineNumber).ToList();
 
-                    if (filtrados.Any())
+                    if (filtered.Any())
                     {
-                        Console.WriteLine($"Se encontraron {filtrados.Count} lotes usando LineNum={LineNumber}");
-                        AssignedBatches = filtrados;
+                        Console.WriteLine($"Found {filtered.Count} batches using LineNum={LineNumber}");
+                        AssignedBatches = filtered;
                     }
                     else
                     {
-                        // Si sigue sin haber resultados, devolver todos los lotes sin filtrar
-                        Console.WriteLine("No se encontraron lotes para ningún valor de LineNum, devolviendo todos los lotes");
-                        AssignedBatches = todosLosLotes;
+                        // If there are still no results, return all batches without filtering
+                        Console.WriteLine("No batches found for any LineNum value, returning all batches");
+                        AssignedBatches = allBatches;
                     }
                 }
             }
             else
             {
-                Console.WriteLine($"No se encontraron lotes para DocEntry {OrderId}");
+                Console.WriteLine($"No batches found for DocEntry {OrderId}");
                 AssignedBatches = new List<AssignedBatch>();
             }
         }
