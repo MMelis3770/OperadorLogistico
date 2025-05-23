@@ -421,7 +421,7 @@
             if (!ValidateOrderDate(orderDate, docDueDate))
             {
                 throw new Exception($"Order {order.DocEntry} is not valid for the current date. " +
-                                              $"Current date must be between {orderDate:yyyy-MM-dd} and {docDueDate:yyyy-MM-dd}");
+                                              $"Current date must be between {orderDate:yyyy-MM-dd} and {docDueDate:yyyy-MM-dd}, the end date has to be at least 4 days later than the current date");
             }
 
             // Validar si el cliente existe en la BBDD
@@ -456,7 +456,9 @@
         try
         {
             var currentDate = DateTime.Now.Date;
-            return currentDate >= orderDate && currentDate <= docDueDate;
+            var minimumDueDate = currentDate.AddDays(4);
+
+            return currentDate >= orderDate && docDueDate >= minimumDueDate;
         }
         catch (Exception ex)
         {
