@@ -15,21 +15,21 @@ public class OrderFileProcessor
         List<OrderData> orders = new List<OrderData>();
         try
         {
-            // Asegurarse de que el directorio existe
+            // Ensure the directory exists
             if (!Directory.Exists(_directoryPath))
             {
-                Console.WriteLine($"El directorio {_directoryPath} no existe.");
+                Console.WriteLine($"The directory {_directoryPath} does not exist.");
                 return orders;
             }
 
             string[] files = Directory.GetFiles(_directoryPath, "*.txt");
-            Console.WriteLine($"Encontrados {files.Length} archivos .txt para procesar");
+            Console.WriteLine($"Found {files.Length} .txt files to process");
 
             foreach (string file in files)
             {
-                Console.WriteLine($"Procesando archivo: {file}");
+                Console.WriteLine($"Processing file: {file}");
                 var fileOrders = ProcessFile(file);
-                Console.WriteLine($"Órdenes extraídas del archivo: {fileOrders.Count}");
+                Console.WriteLine($"Orders extracted from file: {fileOrders.Count}");
 
                 if (fileOrders.Any())
                 {
@@ -42,7 +42,7 @@ public class OrderFileProcessor
             Console.WriteLine($"Error processing files: {ex.Message}");
         }
 
-        Console.WriteLine($"Total de órdenes procesadas: {orders.Count}");
+        Console.WriteLine($"Total orders processed: {orders.Count}");
         return orders;
     }
 
@@ -55,7 +55,7 @@ public class OrderFileProcessor
         try
         {
             string[] lines = File.ReadAllLines(filePath);
-            Console.WriteLine($"Líneas leídas del archivo: {lines.Length}");
+            Console.WriteLine($"Lines read from file: {lines.Length}");
 
             foreach (string line in lines)
             {
@@ -66,13 +66,13 @@ public class OrderFileProcessor
 
                 if (parts.Length < 2)
                 {
-                    Console.WriteLine($"Línea ignorada (formato incorrecto): {line}");
+                    Console.WriteLine($"Line ignored (incorrect format): {line}");
                     continue;
                 }
 
                 if (parts[0] == "HEADER")
                 {
-                    // Añadir la orden anterior si existe
+                    // Add the previous order if it exists
                     if (currentOrder != null)
                     {
                         orders.Add(currentOrder);
@@ -90,17 +90,17 @@ public class OrderFileProcessor
                                 DocDueDate = DateTime.Parse(parts[4].Trim())
                             };
 
-                            Console.WriteLine($"Nueva orden: ID={currentOrder.DocEntry}, Cliente={currentOrder.CardCode}");
+                            Console.WriteLine($"New order: ID={currentOrder.DocEntry}, Client={currentOrder.CardCode}");
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"Error al parsear la cabecera: {ex.Message}");
+                            Console.WriteLine($"Error parsing header: {ex.Message}");
                             currentOrder = null;
                         }
                     }
                     else
                     {
-                        Console.WriteLine($"HEADER incompleto: {line}");
+                        Console.WriteLine($"Incomplete HEADER: {line}");
                         currentOrder = null;
                     }
                 }
@@ -110,10 +110,10 @@ public class OrderFileProcessor
                     {
                         try
                         {
-                            Console.WriteLine($"Parseando LINE: {line}");
+                            Console.WriteLine($"Parsing LINE: {line}");
                             Console.WriteLine($"Parts[1] (DocEntry): '{int.Parse(parts[1].Trim())}'");
                             Console.WriteLine($"Parts[2] (LineNum): '{int.Parse(parts[2].Trim())}'");
-                            Console.WriteLine($"Parts[3] (LineNum): '{parts[3].Trim()}'");
+                            Console.WriteLine($"Parts[3] (ItemCode): '{parts[3].Trim()}'");
                             Console.WriteLine($"Parts[4] (Quantity): '{int.Parse(parts[4].Trim())}'");
 
                             var lineItem = new LineItem
@@ -124,30 +124,30 @@ public class OrderFileProcessor
                                 Quantity = int.Parse(parts[4].Trim()),
                             };
 
-                            // Verificar que la línea corresponde a la orden actual
+                            // Verify that the line corresponds to the current order
                             if (lineItem.DocEntry == currentOrder.DocEntry)
                             {
                                 currentOrder.LineItems.Add(lineItem);
-                                Console.WriteLine($"Línea añadida: Orden={lineItem.DocEntry}, Línea={lineItem.LineNum}, Item={lineItem.ItemCode}");
+                                Console.WriteLine($"Line added: Order={lineItem.DocEntry}, Line={lineItem.LineNum}, Item={lineItem.ItemCode}");
                             }
                             else
                             {
-                                Console.WriteLine($"ID de orden incorrecto en la línea: {line}");
+                                Console.WriteLine($"Incorrect order ID in line: {line}");
                             }
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"Error al parsear la línea: {ex.Message}");
+                            Console.WriteLine($"Error parsing line: {ex.Message}");
                         }
                     }
                     else
                     {
-                        Console.WriteLine($"LINE incompleta: {line}");
+                        Console.WriteLine($"Incomplete LINE: {line}");
                     }
                 }
             }
 
-            // Añadir la última orden si existe
+            // Add the last order if it exists
             if (currentOrder != null)
             {
                 orders.Add(currentOrder);

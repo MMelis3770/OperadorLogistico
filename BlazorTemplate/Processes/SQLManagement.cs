@@ -33,7 +33,7 @@ namespace BlazorTemplate.Processes
                 string validateClientsQuery = "SELECT CardCode FROM dbo.Client WHERE CardCode = @CardCode";
                 var parameters = new { CardCode = cardCode };
 
-                // Usar Query correctamente con los parámetros
+                // Use Query correctly with parameters
                 clients = _connection.Query<Client>(validateClientsQuery, parameters);
 
                 return clients.Any();
@@ -53,29 +53,29 @@ namespace BlazorTemplate.Processes
             SET IsProcessed = @IsProcessed
             WHERE DocEntry = @DocEntry";
 
-                // Crear un objeto anónimo para los parámetros - esto funciona con el método Query
+                // Create an anonymous object for parameters - this works with the Query method
                 var parameters = new
                 {
                     DocEntry = docEntry,
                     IsProcessed = isProcessed ? 1 : 0
                 };
 
-                // Para operaciones UPDATE que no devuelven resultados, necesitamos usar Execute con una lista
-                // Creamos una lista con un solo elemento para el objeto de parámetros
+                // For UPDATE operations that don't return results, we need to use Execute with a list
+                // Create a list with a single element for the parameter object
                 var paramList = new List<object> { parameters };
 
-                // Ejecutar la consulta de actualización
+                // Execute the update query
                 _connection.Execute(updateQuery, paramList);
 
-                // Simular una operación asíncrona
+                // Simulate an asynchronous operation
                 await Task.Delay(50);
 
-                // Como no podemos saber directamente cuántas filas se afectaron (Execute no devuelve un valor)
-                // verificamos si la orden existe después de la actualización
+                // Since we can't directly know how many rows were affected (Execute doesn't return a value)
+                // verify if the order exists after the update
                 var verifyQuery = "SELECT COUNT(1) FROM dbo.Orders WHERE DocEntry = @DocEntry AND IsProcessed = @IsProcessed";
                 var result = _connection.Query<int>(verifyQuery, parameters).FirstOrDefault();
 
-                // Devolver true si se encontró al menos un registro con los valores actualizados
+                // Return true if at least one record was found with the updated values
                 return result > 0;
             }
             catch (Exception ex)
@@ -94,7 +94,7 @@ namespace BlazorTemplate.Processes
                 ErrorMessage = @ErrorMessage
             WHERE DocEntry = @DocEntry";
 
-                // Crear un objeto anónimo para los parámetros y envolverlo en una lista
+                // Create an anonymous object for parameters and wrap it in a list
                 var paramObj = new
                 {
                     DocEntry = docEntry,
@@ -103,17 +103,17 @@ namespace BlazorTemplate.Processes
 
                 var parametersList = new List<object> { paramObj };
 
-                // Ejecutar la consulta de actualización
+                // Execute the update query
                 _connection.Execute(updateQuery, parametersList);
 
-                // Verificar si la actualización fue exitosa consultando después
+                // Verify if the update was successful by querying afterwards
                 var verifyQuery = "SELECT COUNT(1) FROM dbo.Orders WHERE DocEntry = @DocEntry AND HasError = 1";
                 var result = _connection.Query<int>(verifyQuery, new { DocEntry = docEntry }).FirstOrDefault();
 
-                // Simular una operación asíncrona
+                // Simulate an asynchronous operation
                 await Task.Delay(50);
 
-                // Devolver true si se encontró el registro actualizado
+                // Return true if the updated record was found
                 return result > 0;
             }
             catch (Exception ex)
@@ -122,7 +122,7 @@ namespace BlazorTemplate.Processes
             }
         }
 
-        // Método para obtener una orden con su información de error
+        // Method to get an order with its error information
         public OrderData GetOrderWithErrorInfoFromDB(int docEntry)
         {
             try
@@ -135,20 +135,20 @@ namespace BlazorTemplate.Processes
 
                 var parameters = new { DocEntry = docEntry };
 
-                // Obtener datos básicos de la orden
+                // Get basic order data
                 var order = _connection.Query<OrderData>(query, parameters).FirstOrDefault();
 
                 if (order == null)
-                    throw new Exception($"No se encontró la orden con DocEntry {docEntry}");
+                    throw new Exception($"Order with DocEntry {docEntry} not found");
 
-                // Obtener las líneas de la orden
+                // Get order lines
                 order.LineItems = GetOrderLinesFromDatabase(docEntry);
 
                 return order;
             }
             catch (Exception ex)
             {
-                throw new Exception($"Error obteniendo la orden {docEntry} con información de error: {ex.Message}", ex);
+                throw new Exception($"Error getting order {docEntry} with error information: {ex.Message}", ex);
             }
         }
 
@@ -159,7 +159,7 @@ namespace BlazorTemplate.Processes
                 string validateItemCode = "SELECT ItemCode FROM dbo.Inventory";
                 items = _connection.Query<LineItem>(validateItemCode);
 
-                // Verificar si el item existe
+                // Check if the item exists
                 return items.Any(c => c.ItemCode == itemCode);
             }
             catch (Exception ex)
@@ -175,14 +175,14 @@ namespace BlazorTemplate.Processes
 
             try
             {
-                // Iniciar transacción
+                // Start transaction
                 _connection.StartTransaction();
 
                 try
                 {
                     foreach (var order in ordersToSQL)
                     {
-                        // Insertar en la tabla Orders
+                        // Insert into Orders table
                         string insertOrderQuery = @"
                         INSERT INTO dbo.Orders (DocEntry, CardCode, OrderDate, DocDueDate) 
                         VALUES (@DocEntry, @CardCode, @OrderDate, @DocDueDate)";
@@ -200,7 +200,7 @@ namespace BlazorTemplate.Processes
 
                         _connection.Execute(insertOrderQuery, orderParameters);
 
-                        // Insertar las líneas de la orden
+                        // Insert order lines
                         if (order.LineItems != null && order.LineItems.Any())
                         {
                             string insertLineQuery = @"
@@ -213,7 +213,7 @@ namespace BlazorTemplate.Processes
                             {
                                 var item = new LineItem
                                 {
-                                    DocEntry = order.DocEntry,  // Usar el DocEntry de la orden padre
+                                    DocEntry = order.DocEntry,  // Use the parent order's DocEntry
                                     LineNum = line.LineNum,
                                     ItemCode = line.ItemCode,
                                     Quantity = line.Quantity
@@ -221,11 +221,11 @@ namespace BlazorTemplate.Processes
                                 lineItemParameters.Add(item);
                             }
 
-                            
+
 
                             //var lineItemsParameters = order.LineItems.Select(line => new
                             //{
-                            //    DocEntry = order.DocEntry,  // Usar el DocEntry de la orden padre
+                            //    DocEntry = order.DocEntry,  // Use the parent order's DocEntry
                             //    LineNum = line.LineNum,
                             //    ItemCode = line.ItemCode,
                             //    Quantity = line.Quantity
@@ -235,12 +235,12 @@ namespace BlazorTemplate.Processes
                         }
                     }
 
-                    // Commit de la transacción si todo salió bien
+                    // Commit transaction if everything went well
                     _connection.EndTransaction(EndTransactionType.Commit);
                 }
                 catch (Exception)
                 {
-                    // Rollback en caso de error
+                    // Rollback on error
                     if (_connection.InTransaction)
                     {
                         _connection.EndTransaction(EndTransactionType.Rollback);
@@ -267,18 +267,18 @@ namespace BlazorTemplate.Processes
 
                 var result = _connection.Query<string>(query, parameters).FirstOrDefault();
 
-                // Simular una operación asíncrona
+                // Simulate an asynchronous operation
                 await Task.Delay(50);
 
-                return result ?? "No se encontró mensaje de error para esta orden";
+                return result ?? "No error message found for this order";
             }
             catch (Exception ex)
             {
-                throw new Exception($"Error obteniendo mensaje de error para orden {docEntry}: {ex.Message}", ex);
+                throw new Exception($"Error getting error message for order {docEntry}: {ex.Message}", ex);
             }
         }
 
-        // Método para obtener todas las órdenes desde la base de datos
+        // Method to get all orders from the database
         public List<OrderData> GetOrdersFromDatabase()
         {
             try
@@ -291,7 +291,7 @@ namespace BlazorTemplate.Processes
     WHERE o.IsProcessed = 0 AND o.HasError = 0
     GROUP BY o.DocEntry, o.CardCode, o.OrderDate, o.DocDueDate";
 
-                // Definir una clase específica para el resultado
+                // Define a specific class for the result
                 var ordersWithCount = _connection.Query<OrderDataWithCount>(query);
 
                 List<OrderData> result = new List<OrderData>();
@@ -304,7 +304,7 @@ namespace BlazorTemplate.Processes
                         CardCode = item.CardCode,
                         OrderDate = item.OrderDate,
                         DocDueDate = item.DocDueDate,
-                        LineItems = new List<LineItem>() // Se llenarán si es necesario con GetOrderLinesFromDatabase
+                        LineItems = new List<LineItem>() // Will be filled if necessary with GetOrderLinesFromDatabase
                     });
                 }
 
@@ -326,7 +326,7 @@ namespace BlazorTemplate.Processes
             FROM dbo.Batches 
             ORDER BY ExpDate ASC";
 
-                await Task.Delay(50); // Simular operació asíncrona
+                await Task.Delay(50); // Simulate asynchronous operation
 
                 var batchesData = _connection.Query<dynamic>(query);
 
@@ -351,12 +351,12 @@ namespace BlazorTemplate.Processes
             }
         }
 
-        // Método directo para obtener lotes asignados
+        // Direct method to get assigned batches
         public List<AssignedBatch> GetBatchesDirectFromDatabase(int docEntry, int lineNumber)
         {
             try
             {
-                // Hacer una consulta simple y directa, solo filtrando por DocEntry
+                // Make a simple and direct query, only filtering by DocEntry
                 string query = @"
         SELECT DocEntry, LineNum, BatchNum, Quantity 
         FROM [TestOperadorLogistic].[dbo].[AssignedBatches] 
@@ -364,26 +364,26 @@ namespace BlazorTemplate.Processes
 
                 var parameters = new { DocEntry = docEntry };
 
-                // Ejecutar la consulta y obtener los resultados
+                // Execute the query and get the results
                 var results = _connection.Query<AssignedBatch>(query, parameters).ToList();
 
-                // Imprimir todos los resultados sin filtrar más
-                Console.WriteLine($"*** CONSULTA DIRECTA: Lotes para DocEntry={docEntry}: {results.Count} ***");
+                // Print all results without further filtering
+                Console.WriteLine($"*** DIRECT QUERY: Batches for DocEntry={docEntry}: {results.Count} ***");
                 foreach (var batch in results)
                 {
-                    Console.WriteLine($"Lote encontrado: DocEntry={batch.DocEntry}, LineNum={batch.LineNum}, BatchNum={batch.BatchNum}, Quantity={batch.Quantity}");
+                    Console.WriteLine($"Batch found: DocEntry={batch.DocEntry}, LineNum={batch.LineNum}, BatchNum={batch.BatchNum}, Quantity={batch.Quantity}");
                 }
 
                 return results;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"ERROR en consulta directa: {ex.Message}");
+                Console.WriteLine($"ERROR in direct query: {ex.Message}");
                 return new List<AssignedBatch>();
             }
         }
 
-        // Método para obtener los lotes asignados a una orden desde la tabla AssignedBatches
+        // Method to get assigned batches for an order from the AssignedBatches table
         public async Task<List<AssignedBatch>> GetAssignedBatchesForOrderAsync(int docEntry)
         {
             try
@@ -398,7 +398,7 @@ namespace BlazorTemplate.Processes
 
                 var assignedBatches = _connection.Query<AssignedBatch>(query, parameters);
 
-                // Simular operación asíncrona
+                // Simulate asynchronous operation
                 await Task.Delay(50);
 
                 return assignedBatches.ToList();
@@ -409,7 +409,7 @@ namespace BlazorTemplate.Processes
             }
         }
 
-        // Afegir aquest mètode per obtenir batches per ItemCode
+        // Add this method to get batches by ItemCode
         public async Task<List<Batch>> GetBatchesForItemAsync(string itemCode)
         {
             try
@@ -419,7 +419,7 @@ namespace BlazorTemplate.Processes
 
                 if (string.IsNullOrEmpty(itemCode))
                 {
-                    // Si no s'especifica ItemCode, obtenir tots els batches
+                    // If no ItemCode is specified, get all batches
                     query = @"
                 SELECT BatchNum as BatchId, ItemCode, PrdDate as StartDate, 
                        ExpDate as EndDate, Quantity as AvailableQuantity 
@@ -428,7 +428,7 @@ namespace BlazorTemplate.Processes
                 }
                 else
                 {
-                    // Filtrar per ItemCode específic
+                    // Filter by specific ItemCode
                     query = @"
                 SELECT BatchNum as BatchId, ItemCode, PrdDate as StartDate, 
                        ExpDate as EndDate, Quantity as AvailableQuantity 
@@ -438,7 +438,7 @@ namespace BlazorTemplate.Processes
                     parameters = new { ItemCode = itemCode };
                 }
 
-                await Task.Delay(50); // Simular operació asíncrona
+                await Task.Delay(50); // Simulate asynchronous operation
 
                 var batchesData = _connection.Query<dynamic>(query, parameters);
 
@@ -463,7 +463,7 @@ namespace BlazorTemplate.Processes
             }
         }
 
-        // Método para obtener todas las órdenes desde la base de datos, incluyendo procesadas y con errores
+        // Method to get all orders from the database, including processed and with errors
         public List<OrderData> GetAllOrdersFromDatabase()
         {
             try
@@ -474,7 +474,7 @@ SELECT o.DocEntry, o.CardCode, o.OrderDate, o.DocDueDate, o.IsProcessed, o.HasEr
 FROM dbo.Orders o 
 LEFT JOIN dbo.OrderLines l ON o.DocEntry = l.DocEntry 
 GROUP BY o.DocEntry, o.CardCode, o.OrderDate, o.DocDueDate, o.IsProcessed, o.HasError, o.ErrorMessage
-ORDER BY o.DocEntry DESC";  // Ordenar por ID descendente para ver las más recientes primero
+ORDER BY o.DocEntry DESC";  // Order by descending ID to see the most recent first
 
                 var ordersWithCount = _connection.Query<OrderDataWithCount>(query);
 
@@ -491,7 +491,7 @@ ORDER BY o.DocEntry DESC";  // Ordenar por ID descendente para ver las más reci
                         IsProcessed = item.IsProcessed,
                         HasError = item.HasError,
                         ErrorMessage = item.ErrorMessage,
-                        LineItems = new List<LineItem>() // Se llenarán si es necesario con GetOrderLinesFromDatabase
+                        LineItems = new List<LineItem>() // Will be filled if necessary with GetOrderLinesFromDatabase
                     });
                 }
 
@@ -503,7 +503,7 @@ ORDER BY o.DocEntry DESC";  // Ordenar por ID descendente para ver las más reci
             }
         }
 
-        // Método para obtener todas las órdenes desde la base de datos con errores
+        // Method to get all orders with errors from the database
         public List<OrderData> GetAllOrdersWithErrorsFromDatabase()
         {
             try
@@ -532,7 +532,7 @@ ORDER BY o.DocEntry DESC";
                         IsProcessed = item.IsProcessed,
                         HasError = item.HasError,
                         ErrorMessage = item.ErrorMessage,
-                        LineItems = new List<LineItem>() // Se llenarán si es necesario con GetOrderLinesFromDatabase
+                        LineItems = new List<LineItem>() // Will be filled if necessary with GetOrderLinesFromDatabase
                     });
                 }
 
@@ -544,12 +544,12 @@ ORDER BY o.DocEntry DESC";
             }
         }
 
-        // Método para insertar asignaciones de batch cuando una orden es procesada
+        // Method to insert batch assignments when an order is processed
         public async Task<bool> SaveAssignedBatchesAsync(int docEntry, List<LineItem> lineItems)
         {
             try
             {
-                // Filtrar líneas con lotes asignados
+                // Filter lines with assigned batches
                 var linesWithBatches = lineItems.Where(li => !string.IsNullOrEmpty(li.Batch)).ToList();
 
                 foreach (var line in linesWithBatches)
@@ -572,7 +572,7 @@ ORDER BY o.DocEntry DESC";
                     _connection.Execute(insertQuery, parameters);
                 }
 
-                await Task.Delay(50); // Simular operación asíncrona
+                await Task.Delay(50); // Simulate asynchronous operation
                 return true;
             }
             catch (Exception ex)
@@ -581,7 +581,7 @@ ORDER BY o.DocEntry DESC";
             }
         }
 
-        // Método para obtener las líneas de una orden específica
+        // Method to get lines for a specific order
         public List<LineItem> GetOrderLinesFromDatabase(int docEntry)
         {
             try

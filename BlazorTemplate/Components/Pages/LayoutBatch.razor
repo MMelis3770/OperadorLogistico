@@ -33,9 +33,9 @@
     }
 </FluentStack>
 
-<!-- Contenedor principal -->
+<!-- Main container -->
 <div class="grid-and-pagination-container">
-    <!-- Contenedor del grid -->
+    <!-- Grid container -->
     <div class="fixed-height-grid-container">
         <FluentDataGrid Items="@orders" TGridItem="Order" Pagination="@pagination" Class="fixed-row-grid">
 
@@ -63,7 +63,7 @@
         </FluentDataGrid>
     </div>
 
-    <!-- Contenedor para el contador y paginador -->
+    <!-- Container for counter and paginator -->
     <div class="paginator-container">
         <div class="left-section"></div>
         <div class="right-section">
@@ -74,7 +74,7 @@
 
 @if (selectedOrder != null)
 {
-    <h2>Detalle de Comanda: @selectedOrder.ID - @selectedOrder.Client</h2>
+    <h2>Order Detail: @selectedOrder.ID - @selectedOrder.Client</h2>
 
     @if (selectedOrderItems != null && selectedOrderItems.Any())
     {
@@ -129,7 +129,7 @@
     }
 }
 
-<!-- Componente de diálogo para asignar batch -->
+<!-- Batch assignment dialog component -->
 <BatchAssignmentDialog IsOpen="@isBatchDialogOpen"
                        IsOpenChanged="@HandleDialogClosed"
                        OrderId="@currentOrderId"
@@ -138,7 +138,7 @@
                        Quantity="@currentQuantity"
                        OnBatchAssigned="@HandleBatchAssigned" />
 
-<!-- Componente de diálogo para información de batch -->
+<!-- Batch information dialog component -->
 <BatchInfoDialog IsOpen="@isInfoDialogOpen"
                  IsOpenChanged="@HandleInfoDialogClosed"
                  OrderId="@currentOrderId"
@@ -158,16 +158,16 @@
     private System.Threading.Timer refreshTimer;
     private bool isLoading = false;
 
-    // Variables para el diálogo de asignación de batch
+    // Variables for batch assignment dialog
     private bool isBatchDialogOpen = false;
-    // Variables para el diálogo de información de batch
+    // Variables for batch information dialog
     private bool isInfoDialogOpen = false;
 
     private int currentOrderId;
     private int currentLineNumber;
     private string currentItemCode;
     private int currentQuantity;
-    // Diccionari per guardar l'estat del stock de cada línia
+    // Dictionary to store the stock status of each line
     private Dictionary<(int OrderId, int LineNumber), bool> _stockAvailabilityCache = new Dictionary<(int OrderId, int LineNumber), bool>();
 
 
@@ -175,11 +175,11 @@
     {
         await base.OnInitializedAsync();
 
-        // Cargar órdenes seleccionadas al inicializar
+        // Load selected orders on initialization
         await LoadSelectedOrders();
     }
 
-    // Cargar las órdenes seleccionadas desde el servicio compartido
+    // Load selected orders from the shared service
     private async Task LoadSelectedOrders()
     {
         try
@@ -187,14 +187,14 @@
             isLoading = true;
             StateHasChanged();
 
-            // Obtener las órdenes del servicio compartido
+            // Get orders from the shared service
             var selectedOrdersData = _selectedOrdersService.SelectedOrders;
 
             if (selectedOrdersData != null && selectedOrdersData.Any())
             {
                 processedOrders = selectedOrdersData;
 
-                // Convertir a formato para la grid
+                // Convert to format for the grid
                 var orderList = processedOrders.Select(o => new Order(
                     o.DocEntry,
                     o.CardCode,
@@ -205,19 +205,19 @@
 
                 orders = orderList.AsQueryable();
 
-                // Mostrar mensaje informativo
-                await _dialogService.ShowInfoAsync($"Se han cargado {processedOrders.Count} comandas seleccionadas.", "Información");
+                // Show informative message
+                await _dialogService.ShowInfoAsync($"{processedOrders.Count} selected orders have been loaded.", "Information");
             }
             else
             {
-                // Si no hay órdenes seleccionadas, mostrar grid vacío
+                // If no orders selected, show empty grid
                 orders = new List<Order>().AsQueryable();
-                await _dialogService.ShowInfoAsync("No hay comandas seleccionadas para procesar.", "Información");
+                await _dialogService.ShowInfoAsync("No orders selected for processing.", "Information");
             }
         }
         catch (Exception ex)
         {
-            await _dialogService.ShowErrorAsync($"Error al cargar comandas seleccionadas: {ex.Message}", "Error");
+            await _dialogService.ShowErrorAsync($"Error loading selected orders: {ex.Message}", "Error");
         }
         finally
         {
@@ -228,22 +228,22 @@
 
     private async void HandleRowClick(Order order)
     {
-        if (order == null || order.ID <= 0) return;  // Ignorar clics en filas vacías (ID ≤ 0)
+        if (order == null || order.ID <= 0) return;  // Ignore clicks on empty rows (ID ≤ 0)
 
         selectedOrder = order;
-        StateHasChanged(); // Forzar actualización para mostrar el encabezado de la sección de detalles
+        StateHasChanged(); // Force update to show the detail section header
 
-        // Busca en las órdenes procesadas
+        // Search in processed orders
         var orderData = processedOrders.FirstOrDefault(o => o.DocEntry == selectedOrder.ID);
 
         if (orderData != null && orderData.LineItems.Any())
         {
-            // NOVA FUNCIONALITAT: Validar stock per a cada línia
-            _stockAvailabilityCache.Clear(); // Netejar cache anterior
+            // NEW FUNCTIONALITY: Validate stock for each line
+            _stockAvailabilityCache.Clear(); // Clear previous cache
 
             bool anyStockIssue = false;
             StringBuilder errorMessageBuilder = new StringBuilder();
-            errorMessageBuilder.AppendLine("Se han detectado problemas de stock en los siguientes artículos:");
+            errorMessageBuilder.AppendLine("Stock issues have been detected in the following items:");
             errorMessageBuilder.AppendLine();
 
             foreach (var line in orderData.LineItems)
@@ -251,15 +251,15 @@
                 var (hasSufficientStock, availableQuantity) = await _batchService.ValidateStockAvailabilityAsync(line.ItemCode, line.Quantity);
                 _stockAvailabilityCache[(selectedOrder.ID, line.LineNum)] = hasSufficientStock;
 
-                // Si hay un problema de stock, añadirlo al mensaje de error
+                // If there's a stock issue, add it to the error message
                 if (!hasSufficientStock)
                 {
                     anyStockIssue = true;
-                    errorMessageBuilder.AppendLine($"- Artículo: {line.ItemCode}, Requerido: {line.Quantity}, Disponible: {availableQuantity}, Diferencia: {line.Quantity - availableQuantity}");
+                    errorMessageBuilder.AppendLine($"- Item: {line.ItemCode}, Required: {line.Quantity}, Available: {availableQuantity}, Difference: {line.Quantity - availableQuantity}");
                 }
             }
 
-            // Si hay algún problema de stock, actualizar el estado de error de la orden
+            // If there's any stock issue, update the order's error status
             if (anyStockIssue)
             {
                 try
@@ -268,11 +268,11 @@
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error al actualizar estado de error: {ex.Message}");
+                    Console.WriteLine($"Error updating error status: {ex.Message}");
                 }
             }
 
-            // Convertir las líneas al formato para la grid
+            // Convert lines to format for the grid
             var lineItems = orderData.LineItems
                 .Select(li => new OrderLineItem(
                     li.LineNum,
@@ -285,28 +285,28 @@
             selectedOrderItems = lineItems.AsQueryable();
         }
 
-        // Segunda llamada a StateHasChanged para actualizar la grid de líneas
+        // Second call to StateHasChanged to update the lines grid
         StateHasChanged();
     }
 
     private async Task HandleDeleteClick(Order order)
     {
-        if (order == null || order.ID <= 0) return;  // Ignorar clics en filas vacías
+        if (order == null || order.ID <= 0) return;  // Ignore clicks on empty rows
 
         var dialogResult = await _dialogService.ShowConfirmationAsync(
-            $"¿Está seguro que desea eliminar la comanda {order.ID}?",
-            "Confirmar eliminación");
+            $"Are you sure you want to delete order {order.ID}?",
+            "Confirm deletion");
 
         var result = await dialogResult.Result;
         if (result.Cancelled)
         {
-            return; // Usuario canceló
+            return; // User cancelled
         }
 
-        // Eliminar de processedOrders
+        // Remove from processedOrders
         processedOrders.RemoveAll(o => o.DocEntry == order.ID);
 
-        // Actualizar la vista
+        // Update the view
         var orderList = processedOrders.Select(o => new Order(
             o.DocEntry,
             o.CardCode,
@@ -317,10 +317,10 @@
 
         orders = orderList.AsQueryable();
 
-        // Actualizar el servicio compartido
+        // Update the shared service
         _selectedOrdersService.SetSelectedOrders(processedOrders);
 
-        // Limpiar selección si el orden eliminado era el seleccionado
+        // Clear selection if the deleted order was the selected one
         if (selectedOrder != null && selectedOrder.ID == order.ID)
         {
             selectedOrder = null;
@@ -336,13 +336,13 @@
 
         var key = (selectedOrder.ID, lineItem.LineNumber);
 
-        // Consultar el cache per veure si aquesta línia té suficient stock
+        // Query the cache to see if this line has sufficient stock
         if (_stockAvailabilityCache.TryGetValue(key, out bool hasStock))
         {
             return hasStock;
         }
 
-        // Si no està al cache, assumim que sí té stock (per evitar errors)
+        // If it's not in the cache, assume it has stock (to avoid errors)
         return true;
     }
 
@@ -350,7 +350,7 @@
     {
         if (processedOrders == null || !processedOrders.Any())
         {
-            await _dialogService.ShowInfoAsync("No hay comandas para procesar.", "Información");
+            await _dialogService.ShowInfoAsync("No orders to process.", "Information");
             return;
         }
 
@@ -359,7 +359,7 @@
             isLoading = true;
             StateHasChanged();
 
-            // NUEVA VALIDACIÓN: Verificar stock insuficiente ANTES de procesar
+            // NEW VALIDATION: Check insufficient stock BEFORE processing
             List<string> ordersWithInsufficientStock = new List<string>();
 
             foreach (var order in processedOrders)
@@ -370,16 +370,16 @@
 
                     if (!hasSufficientStock)
                     {
-                        ordersWithInsufficientStock.Add($"Orden {order.DocEntry}, Línea {line.LineNum + 1}: {line.ItemCode} (Necesario: {line.Quantity}, Disponible: {availableQuantity})");
+                        ordersWithInsufficientStock.Add($"Order {order.DocEntry}, Line {line.LineNum + 1}: {line.ItemCode} (Required: {line.Quantity}, Available: {availableQuantity})");
                     }
                 }
             }
 
-            // Si hay stock insuficiente, bloquear el procesamiento
+            // If there's insufficient stock, block processing
             if (ordersWithInsufficientStock.Any())
             {
                 var errorMessage = new StringBuilder();
-                errorMessage.AppendLine("No se puede procesar las comandas porque hay líneas con stock insuficiente:");
+                errorMessage.AppendLine("Orders cannot be processed because there are lines with insufficient stock:");
                 errorMessage.AppendLine("");
                 foreach (var error in ordersWithInsufficientStock)
                 {
@@ -388,14 +388,14 @@
                 }
                 errorMessage.AppendLine("");
 
-                await _dialogService.ShowErrorAsync(errorMessage.ToString(), "Stock Insuficiente");
+                await _dialogService.ShowErrorAsync(errorMessage.ToString(), "Insufficient Stock");
 
                 isLoading = false;
                 StateHasChanged();
-                return; // SALIR SIN PROCESAR
+                return; // EXIT WITHOUT PROCESSING
             }
 
-            // Resto del código existente (verificar batches asignados, etc.)
+            // Rest of existing code (check assigned batches, etc.)
             List<int> ordersWithMissingBatches = new List<int>();
             foreach (var order in processedOrders)
             {
@@ -406,52 +406,52 @@
                 }
             }
 
-            // Si hay órdenes con batches sin asignar, mostrar diálogo de advertencia
+            // If there are orders with unassigned batches, show warning dialog
             if (ordersWithMissingBatches.Any())
             {
                 var message = new StringBuilder();
-                message.AppendLine("Las siguientes comandas tienen productos sin lotes asignados:");
+                message.AppendLine("The following orders have products without assigned batches:");
                 message.AppendLine("");
                 foreach (var orderId in ordersWithMissingBatches)
                 {
-                    message.AppendLine($"- Comanda {orderId}");
+                    message.AppendLine($"- Order {orderId}");
                 }
                 message.AppendLine("");
-                message.AppendLine("¿Desea continuar y asignar lotes automáticamente?");
+                message.AppendLine("Do you want to continue and assign batches automatically?");
 
                 var dialogResult = await _dialogService.ShowConfirmationAsync(
                     message.ToString(),
-                    "Lotes no asignados");
+                    "Unassigned batches");
 
                 var result = await dialogResult.Result;
                 if (result.Cancelled)
                 {
                     isLoading = false;
                     StateHasChanged();
-                    return; // Usuario canceló
+                    return; // User cancelled
                 }
 
-                // Asignar batches automáticamente a las órdenes que lo necesitan
+                // Automatically assign batches to orders that need them
                 foreach (var orderId in ordersWithMissingBatches)
                 {
                     await _batchService.AutoAssignBatchesToOrderAsync(orderId);
                 }
             }
 
-            // Mostrar resumen de las órdenes a procesar
+            // Show summary of orders to process
             var summary = new StringBuilder();
-            summary.AppendLine($"Se procesarán {processedOrders.Count} comandas:");
+            summary.AppendLine($"{processedOrders.Count} orders will be processed:");
             summary.AppendLine("");
 
             foreach (var order in processedOrders)
             {
-                summary.AppendLine($"- Orden {order.DocEntry}: {order.CardCode}, {order.LineItems.Count} líneas");
+                summary.AppendLine($"- Order {order.DocEntry}: {order.CardCode}, {order.LineItems.Count} lines");
             }
 
-            // Confirmación antes de procesar
+            // Confirmation before processing
             var processDialogResult = await _dialogService.ShowConfirmationAsync(
                 summary.ToString(),
-                "Confirmar Procesamiento");
+                "Confirm Processing");
 
             var processResult = await processDialogResult.Result;
             if (processResult.Cancelled)
@@ -461,31 +461,31 @@
                 return;
             }
 
-            // Lista para almacenar órdenes cuyo estado no se pudo actualizar
+            // List to store orders whose status could not be updated
             List<int> failedStatusUpdates = new List<int>();
 
-            // NUEVO: Actualizar el estado de IsProcessed a 1 para todas las órdenes
+            // NEW: Update IsProcessed status to 1 for all orders
             foreach (var order in processedOrders)
             {
                 try
                 {
-                    // Asumiendo que _batchService tiene acceso a SQLManagement o inyectarlo directamente
+                    // Assuming _batchService has access to SQLManagement or inject it directly
                     bool updateSuccess = await _batchService.UpdateOrderProcessedStatusAsync(order.DocEntry);
 
                     if (updateSuccess)
                     {
-                        // Si la actualización del estado fue exitosa, guardar los lotes asignados
+                        // If status update was successful, save assigned batches
                         try
                         {
                             bool batchesSaved = await _batchService.SaveAssignedBatchesToDatabaseAsync(order.DocEntry, order.LineItems);
                             if (!batchesSaved)
                             {
-                                Console.WriteLine($"Advertencia: No se pudieron guardar los lotes asignados para la orden {order.DocEntry}");
+                                Console.WriteLine($"Warning: Could not save assigned batches for order {order.DocEntry}");
                             }
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"Error al guardar lotes asignados para orden {order.DocEntry}: {ex.Message}");
+                            Console.WriteLine($"Error saving assigned batches for order {order.DocEntry}: {ex.Message}");
                         }
                     }
                     else
@@ -496,43 +496,43 @@
                 catch (Exception ex)
                 {
                     failedStatusUpdates.Add(order.DocEntry);
-                    // Opcional: registrar el error
-                    Console.WriteLine($"Error al actualizar estado de orden {order.DocEntry}: {ex.Message}");
+                    // Optional: log the error
+                    Console.WriteLine($"Error updating status for order {order.DocEntry}: {ex.Message}");
                 }
             }
 
-            // Opcional: Mostrar advertencia si algunas órdenes no se actualizaron
+            // Optional: Show warning if some orders were not updated
             if (failedStatusUpdates.Any())
             {
                 var warningMessage = new StringBuilder();
-                warningMessage.AppendLine("No se pudo actualizar el estado de las siguientes comandas:");
+                warningMessage.AppendLine("Could not update the status of the following orders:");
                 warningMessage.AppendLine("");
                 foreach (var orderId in failedStatusUpdates)
                 {
-                    warningMessage.AppendLine($"- Comanda {orderId}");
+                    warningMessage.AppendLine($"- Order {orderId}");
                 }
 
                 await _dialogService.ShowWarningAsync(
                     warningMessage.ToString(),
-                    "Advertencia");
+                    "Warning");
             }
 
-            // Simulación de procesamiento con progreso
+            // Processing simulation with progress
             int totalOrders = processedOrders.Count;
             for (int i = 0; i < totalOrders; i++)
             {
                 var order = processedOrders[i];
-                await Task.Delay(500); // Simulación de procesamiento por orden
+                await Task.Delay(500); // Processing simulation per order
 
-                // Opcional: confirmar cada orden en SAP
+                // Optional: confirm each order in SAP
                 bool sapResult = await _orderService.ConfirmOrderToSQL(order.DocEntry);
                 if (!sapResult)
                 {
-                    await _dialogService.ShowWarningAsync($"Advertencia: La orden {order.DocEntry} no se pudo confirmar en SAP.", "Advertencia");
+                    await _dialogService.ShowWarningAsync($"Warning: Order {order.DocEntry} could not be confirmed in SAP.", "Warning");
                 }
             }
 
-            // RESTAURAR EL JSON: Convertir las órdenes a formato JSON para mostrar y para la API
+            // RESTORE JSON: Convert orders to JSON format for display and API
             string jsonOrders = ConvertOrdersToJson(processedOrders);
 
             var content = new StringContent(jsonOrders, Encoding.UTF8, "application/json");
@@ -548,7 +548,7 @@
 
                 await _dialogService.ShowInfoAsync(
                     responseContent,
-                    "Éxito");
+                    "Success");
             }
             else
             {
@@ -556,10 +556,10 @@
                 string errorContent = await response.Content.ReadAsStringAsync();
                 await _dialogService.ShowErrorAsync(
                     $"Error {response.StatusCode}: {errorContent}",
-                    "Error en API");
+                    "API Error");
             }
 
-            // Limpiar después de procesar
+            // Clean up after processing
             processedOrders.Clear();
             _selectedOrdersService.ClearSelectedOrders();
             orders = new List<Order>().AsQueryable();
@@ -568,7 +568,7 @@
         }
         catch (Exception ex)
         {
-            await _dialogService.ShowErrorAsync($"Error al procesar comandas: {ex.Message}", "Error");
+            await _dialogService.ShowErrorAsync($"Error processing orders: {ex.Message}", "Error");
         }
         finally
         {
@@ -577,12 +577,12 @@
         }
     }
 
-    // Método auxiliar para convertir las órdenes a formato JSON
+    // Helper method to convert orders to JSON format
     private string ConvertOrdersToJson(List<OrderData> orders)
     {
         try
         {
-            // Crear un objeto anónimo que represente las órdenes en el formato deseado para la API
+            // Create an anonymous object that represents the orders in the desired format for the API
             var apiOrders = orders.Select(o => new
             {
                 id = o.DocEntry,
@@ -594,11 +594,11 @@
                     lineNumber = li.LineNum + 1,
                     itemCode = li.ItemCode,
                     quantity = li.Quantity,
-                    batch = li.Batch // Esto incluirá los lotes asignados
+                    batch = li.Batch // This will include assigned batches
                 }).ToList()
             }).ToList();
 
-            // Serializar a JSON con formato indentado para mejor visualización
+            // Serialize to JSON with indented format for better visualization
             var options = new System.Text.Json.JsonSerializerOptions
                 {
                     WriteIndented = true,
@@ -609,26 +609,26 @@
         }
         catch (Exception ex)
         {
-            // En caso de error, devolver mensaje de error como JSON
-            return $"{{ \"error\": \"Error al generar JSON: {ex.Message}\" }}";
+            // In case of error, return error message as JSON
+            return $"{{ \"error\": \"Error generating JSON: {ex.Message}\" }}";
         }
     }
 
-    // Método para abrir el diálogo de asignación de batch
+    // Method to open batch assignment dialog
     private async Task OpenBatchAssignmentDialog(OrderLineItem lineItem)
     {
         if (lineItem == null || selectedOrder == null) return;
 
-        // NOVA VALIDACIÓ: Verificar si hi ha suficient stock disponible
+        // NEW VALIDATION: Check if there's sufficient available stock
         var (hasSufficientStock, availableQuantity) = await _batchService.ValidateStockAvailabilityAsync(lineItem.ItemCode, lineItem.Quantity);
 
         if (!hasSufficientStock)
         {
-            // Preparar el mensaje de error
-            var message = $"No hi ha suficient stock disponible per al article {lineItem.ItemCode}.\n\n" +
-                         $"Quantitat requerida: {lineItem.Quantity}\n" +
-                         $"Quantitat disponible: {availableQuantity}\n" +
-                         $"Diferència: {lineItem.Quantity - availableQuantity}";
+            // Prepare error message
+            var message = $"There is not enough stock available for item {lineItem.ItemCode}.\n\n" +
+                         $"Required quantity: {lineItem.Quantity}\n" +
+                         $"Available quantity: {availableQuantity}\n" +
+                         $"Difference: {lineItem.Quantity - availableQuantity}";
 
             try
             {
@@ -636,26 +636,26 @@
 
                 if (updateResult)
                 {
-                    // Opcional: indicar en el mensaje que se ha marcado la orden con error
-                    message += "\n\nLa comanda ha sido marcada con error.";
+                    // Optional: indicate in the message that the order has been marked with error
+                    message += "\n\nThe order has been marked with error.";
                 }
                 else
                 {
-                    Console.WriteLine($"No se pudo actualizar el estado de error para la orden {selectedOrder.ID}");
+                    Console.WriteLine($"Could not update error status for order {selectedOrder.ID}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error al actualizar el estado de error: {ex.Message}");
-                // Continuamos con la visualización del mensaje de error aunque falle la actualización
+                Console.WriteLine($"Error updating error status: {ex.Message}");
+                // Continue with error message display even if update fails
             }
 
-            // Mostrar el mensaje de error al usuario
-            await _dialogService.ShowErrorAsync(message, "Stock Insuficient");
-            return; // No abrir el diálogo
+            // Show error message to user
+            await _dialogService.ShowErrorAsync(message, "Insufficient Stock");
+            return; // Don't open the dialog
         }
 
-        // Si hay suficiente stock, continuar con la asignación normal
+        // If there's sufficient stock, continue with normal assignment
         currentOrderId = selectedOrder.ID;
         currentLineNumber = lineItem.LineNumber;
         currentItemCode = lineItem.ItemCode;
@@ -665,7 +665,7 @@
         StateHasChanged();
     }
 
-    // Método para abrir el diálogo de información de batch
+    // Method to open batch information dialog
     private void OpenBatchInfoDialog(OrderLineItem lineItem)
     {
         if (lineItem == null || selectedOrder == null) return;
@@ -679,39 +679,39 @@
         StateHasChanged();
     }
 
-    // Método para manejar el cierre del diálogo de asignación
+    // Method to handle assignment dialog closing
     private void HandleDialogClosed(bool isOpen)
     {
         isBatchDialogOpen = isOpen;
         StateHasChanged();
     }
 
-    // Método para manejar el cierre del diálogo de información
+    // Method to handle information dialog closing
     private void HandleInfoDialogClosed(bool isOpen)
     {
         isInfoDialogOpen = isOpen;
 
-        // Si se acaba de cerrar el diálogo, recargar la vista
+        // If the dialog just closed, reload the view
         if (!isOpen && selectedOrder != null)
         {
-            // Forzar una actualización de la interfaz
+            // Force an interface update
             InvokeAsync(StateHasChanged);
         }
     }
 
-    // Método para manejar la asignación exitosa de un batch
+    // Method to handle successful batch assignment
     private async Task HandleBatchAssigned(bool success)
     {
         if (success)
         {
-            // Actualizar la vista de detalle
+            // Update the detail view
             if (selectedOrder != null)
             {
-                // Recargar los detalles de la orden seleccionada
+                // Reload details of the selected order
                 var orderData = processedOrders.FirstOrDefault(o => o.DocEntry == selectedOrder.ID);
                 if (orderData != null && orderData.LineItems.Any())
                 {
-                    // Convertir las líneas al formato para la grid
+                    // Convert lines to format for the grid
                     var lineItems = orderData.LineItems
                         .Select(li => new OrderLineItem(
                             li.LineNum,
@@ -726,7 +726,7 @@
                 }
             }
 
-            await _dialogService.ShowInfoAsync("Lote asignado correctamente.", "Éxito");
+            await _dialogService.ShowInfoAsync("Batch assigned successfully.", "Success");
         }
     }
 
@@ -738,16 +738,16 @@
 
             if (result)
             {
-                await _dialogService.ShowInfoAsync($"Orden {orderId} confirmada en SAP con éxito.", "Confirmación");
+                await _dialogService.ShowInfoAsync($"Order {orderId} confirmed in SAP successfully.", "Confirmation");
             }
             else
             {
-                await _dialogService.ShowErrorAsync($"No se pudo confirmar la orden {orderId} en SAP.", "Error");
+                await _dialogService.ShowErrorAsync($"Could not confirm order {orderId} in SAP.", "Error");
             }
         }
         catch (Exception ex)
         {
-            await _dialogService.ShowErrorAsync($"Error al confirmar la orden en SAP: {ex.Message}", "Error");
+            await _dialogService.ShowErrorAsync($"Error confirming order in SAP: {ex.Message}", "Error");
         }
     }
 

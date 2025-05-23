@@ -8,7 +8,6 @@ namespace BlazorTemplate
     {
         public static IServiceCollection AddApplicationServices(this IServiceCollection services)
         {
-            // Registrar los servicios
             services.AddScoped<IOrderService, OrderService>();
             services.AddSingleton<ISelectedOrdersService, SelectedOrdersService>();
             services.AddScoped<IBatchService, BatchService>();

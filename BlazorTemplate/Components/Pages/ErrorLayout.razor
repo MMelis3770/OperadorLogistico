@@ -21,9 +21,9 @@
 <PageTitle>Errors</PageTitle>
 <h1>Errors</h1>
 
-<!-- Contenedor principal -->
+<!-- Main container -->
 <div class="grid-and-pagination-container">
-    <!-- Contenedor del grid -->
+    <!-- Grid container -->
     <div class="fixed-height-grid-container">
         <FluentDataGrid Items="@orders" TGridItem="Order" Pagination="@pagination" Class="fixed-row-grid">
 
@@ -33,7 +33,7 @@
             <PropertyColumn Property="@(o => o.Expiration)" Format="yyyy-MM-dd" Sortable="true" />
             <PropertyColumn Property="@(o => o.LineCount)" Title="Lines" Sortable="true" />
 
-            <!-- Nueva columna para mostrar si tiene error -->
+            <!-- New column to show if it has an error -->
             <TemplateColumn Title="Error">
                 <ChildContent>
                     <div style="display: flex; justify-content: flex-start;">
@@ -51,7 +51,7 @@
                 </ChildContent>
             </TemplateColumn>
 
-            <!-- Columna para ver detalles -->
+            <!-- Column to view details -->
             <TemplateColumn Title="">
                 <ChildContent>
                     <button @onclick="@(() => HandleRowClick(context))"
@@ -63,7 +63,7 @@
         </FluentDataGrid>
     </div>
 
-    <!-- Contenedor para el contador y paginador -->
+    <!-- Container for counter and paginator -->
     <div class="paginator-container">
         <div class="left-section"></div>
         <div class="right-section">
@@ -74,7 +74,7 @@
 
 @if (selectedOrder != null)
 {
-    <h2>Detalle de Comanda: @selectedOrder.ID - @selectedOrder.Client</h2>
+    <h2>Order Detail: @selectedOrder.ID - @selectedOrder.Client</h2>
 
     @if (selectedOrderItems != null && selectedOrderItems.Any())
     {
@@ -89,13 +89,13 @@
     else
     {
         <div class="alert alert-info" style="margin-top: 20px">
-            No hay líneas disponibles para esta comanda.
+            No lines available for this order.
         </div>
     }
 }
 
 @code {
-    // Modificar el record para incluir IsProcessed y HasError
+    // Modify the record to include IsProcessed and HasError
     record Order(int ID, string Client, DateOnly Date, DateOnly Expiration, int LineCount, int IsProcessed, int HasError);
     record OrderLineItem(int LineNumber, string ItemCode, int Quantity, string Batch);
 
@@ -128,62 +128,62 @@
     {
         try
         {
-            // Modificar para obtener todas las órdenes (incluyendo procesadas y con error)
-            var sqlOrders = sqlManagement.GetAllOrdersWithErrorsFromDatabase(); 
+            // Modify to get all orders (including processed and with errors)
+            var sqlOrders = sqlManagement.GetAllOrdersWithErrorsFromDatabase();
 
-            // Convertir a formato para la grid, incluyendo IsProcessed y HasError
+            // Convert to format for the grid, including IsProcessed and HasError
             var orderList = sqlOrders.Select(o => new Order(
                 o.DocEntry,
                 o.CardCode,
                 DateOnly.FromDateTime(o.OrderDate),
                 DateOnly.FromDateTime(o.DocDueDate),
                 sqlManagement.GetOrderLinesFromDatabase(o.DocEntry).Count,
-                o.IsProcessed, // Incluir campo IsProcessed
-                o.HasError     // Incluir campo HasError
+                o.IsProcessed, // Include IsProcessed field
+                o.HasError     // Include HasError field
             )).ToList();
 
             orders = orderList.AsQueryable();
 
-            // Limpiar la selección actual si existe
+            // Clear current selection if it exists
             selectedOrder = null;
             selectedOrderItems = null;
         }
         catch (Exception ex)
         {
-            throw new Exception($"Error al cargar órdenes desde SQL: {ex.Message}", ex);
+            throw new Exception($"Error loading orders from SQL: {ex.Message}", ex);
         }
     }
 
     private async void HandleRowClick(Order order)
     {
-        if (order == null || order.ID <= 0) return;  // Ignorar clics en filas vacías (ID ≤ 0)
+        if (order == null || order.ID <= 0) return;  // Ignore clicks on empty rows (ID ≤ 0)
 
         selectedOrder = order;
-        StateHasChanged(); // Forzar actualización para mostrar el encabezado de la sección de detalles
+        StateHasChanged(); // Force update to show the detail section header
 
         try
         {
-            // Obtener las líneas de la orden desde SQL
+            // Get order lines from SQL
             var lineItemsFromDB = sqlManagement.GetOrderLinesFromDatabase(selectedOrder.ID);
-            Console.WriteLine($"Líneas recuperadas para orden {selectedOrder.ID}: {lineItemsFromDB.Count}");
+            Console.WriteLine($"Lines retrieved for order {selectedOrder.ID}: {lineItemsFromDB.Count}");
 
             if (lineItemsFromDB != null && lineItemsFromDB.Any())
             {
-                // Convertir las líneas al formato para la grid
+                // Convert lines to format for the grid
                 var lineItems = new List<OrderLineItem>();
 
-                // Si la orden está procesada, obtener los lotes asignados
+                // If the order is processed, get assigned batches
                 if (order.IsProcessed == 1)
                 {
                     try
                     {
-                        // Usar BatchService para obtener los lotes asignados
+                        // Use BatchService to get assigned batches
                         var assignedBatches = await _batchService.GetAssignedBatchesFromDatabaseAsync(order.ID);
 
-                        // Manejar cada línea por separado
+                        // Handle each line separately
                         foreach (var li in lineItemsFromDB)
                         {
-                            // Buscar lotes asignados para esta línea
+                            // Look for assigned batches for this line
                             var lineBatches = assignedBatches
                                 .Where(ab => ab.LineNum == li.LineNum)
                                 .ToList();
@@ -191,13 +191,13 @@
                             string batchInfo;
                             if (lineBatches.Any())
                             {
-                                // Si hay lotes asignados, utilizarlos (son los valores reales)
+                                // If there are assigned batches, use them (they are the real values)
                                 batchInfo = string.Join(", ", lineBatches.Select(ab => ab.BatchNum));
                             }
                             else
                             {
-                                // Si no hay lotes asignados en la base de datos, mostrar "Sin asignar"
-                                batchInfo = "Sin asignar";
+                                // If there are no assigned batches in the database, show "Unassigned"
+                                batchInfo = "Unassigned";
                             }
 
                             lineItems.Add(new OrderLineItem(
@@ -210,28 +210,28 @@
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Error al obtener lotes asignados: {ex.Message}");
+                        Console.WriteLine($"Error getting assigned batches: {ex.Message}");
 
-                        // Si falla la obtención de lotes, usar las líneas sin información de lotes
+                        // If getting batches fails, use lines without batch information
                         lineItems = lineItemsFromDB
                             .Select(li => new OrderLineItem(
                                 li.LineNum,
                                 li.ItemCode,
                                 li.Quantity,
-                                "Sin asignar" // Valor por defecto
+                                "Unassigned" // Default value
                             ))
                             .ToList();
                     }
                 }
                 else
                 {
-                    // Si la orden no está procesada, simplemente mostrar "Sin asignar"
+                    // If the order is not processed, simply show "Unassigned"
                     lineItems = lineItemsFromDB
                         .Select(li => new OrderLineItem(
                             li.LineNum,
                             li.ItemCode,
                             li.Quantity,
-                            "Sin asignar" // No hay lotes asignados para órdenes no procesadas
+                            "Unassigned" // No batches assigned for unprocessed orders
                         ))
                         .ToList();
                 }
@@ -240,69 +240,69 @@
             }
             else
             {
-                // Si no se encuentran líneas, mostrar una colección vacía
+                // If no lines are found, show an empty collection
                 selectedOrderItems = Array.Empty<OrderLineItem>().AsQueryable();
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error al obtener líneas para orden {order.ID}: {ex.Message}");
-            // Si ocurre un error, mostrar una colección vacía
+            Console.WriteLine($"Error getting lines for order {order.ID}: {ex.Message}");
+            // If an error occurs, show an empty collection
             selectedOrderItems = Array.Empty<OrderLineItem>().AsQueryable();
         }
 
-        // Segunda llamada a StateHasChanged para actualizar la grid de líneas
+        // Second call to StateHasChanged to update the lines grid
         StateHasChanged();
     }
 
-    // Método para mostrar detalles del error
+    // Method to show error details
     private async Task ShowErrorDetails(int orderId)
     {
         try
         {
-            // Obtener el mensaje de error desde la base de datos
+            // Get the error message from the database
             string errorMessage = await sqlManagement.GetOrderErrorMessageAsync(orderId);
 
             if (!string.IsNullOrEmpty(errorMessage))
             {
-                // Formatear el mensaje para mejor visualización
+                // Format the message for better visualization
                 var formattedMessage = errorMessage
                     .Replace("\n", "<br/>")
-                    .Replace("- Artículo:", "<div style='margin-top: 8px; margin-bottom: 5px;'><b>- Artículo:</b>")
-                    .Replace("Requerido:", "<b>Requerido:</b>")
-                    .Replace("Disponible:", "<b>Disponible:</b>")
-                    .Replace("Diferencia:", "<b>Diferencia:</b></div>");
+                    .Replace("- Item:", "<div style='margin-top: 8px; margin-bottom: 5px;'><b>- Item:</b>")
+                    .Replace("Required:", "<b>Required:</b>")
+                    .Replace("Available:", "<b>Available:</b>")
+                    .Replace("Difference:", "<b>Difference:</b></div>");
 
-                // Mostrar el diálogo con el mensaje formateado
-                await _dialogService.ShowErrorAsync(formattedMessage, $"Error en Comanda {orderId}");
+                // Show the dialog with the formatted message
+                await _dialogService.ShowErrorAsync(formattedMessage, $"Error in Order {orderId}");
 
-                // Si adicionalmente quieres mostrar el JSON de la orden con error
+                // If you additionally want to show the JSON of the order with error
                 var order = sqlManagement.GetOrderWithErrorInfoFromDB(orderId);
                 if (order != null && order.HasError == 1)
                 {
                     string jsonForFailedOrder = ConvertOrdersToJson(new List<OrderData> { order });
-                    Console.WriteLine($"JSON para orden con error {orderId}:");
+                    Console.WriteLine($"JSON for order with error {orderId}:");
                     Console.WriteLine(jsonForFailedOrder);
 
                 }
             }
             else
             {
-                await _dialogService.ShowInfoAsync("No se encontró información de error para esta comanda.", "Información");
+                await _dialogService.ShowInfoAsync("No error information found for this order.", "Information");
             }
         }
         catch (Exception ex)
         {
-            await _dialogService.ShowErrorAsync($"Error al obtener detalles del error: {ex.Message}", "Error");
+            await _dialogService.ShowErrorAsync($"Error getting error details: {ex.Message}", "Error");
         }
     }
 
-    // Método auxiliar para convertir las órdenes a formato JSON (copiado de tu clase)
+    // Helper method to convert orders to JSON format (copied from your class)
     private string ConvertOrdersToJson(List<OrderData> orders)
     {
         try
         {
-            // Crear un objeto anónimo que represente las órdenes en el formato deseado para la API
+            // Create an anonymous object that represents the orders in the desired format for the API
             var apiOrders = orders.Select(o => new
             {
                 id = o.DocEntry,
@@ -320,7 +320,7 @@
                 }).ToList()
             }).ToList();
 
-            // Serializar a JSON con formato indentado para mejor visualización
+            // Serialize to JSON with indented format for better visualization
             var options = new System.Text.Json.JsonSerializerOptions
                 {
                     WriteIndented = true,
@@ -331,8 +331,8 @@
         }
         catch (Exception ex)
         {
-            // En caso de error, devolver mensaje de error como JSON
-            return $"{{ \"error\": \"Error al generar JSON: {ex.Message}\" }}";
+            // In case of error, return error message as JSON
+            return $"{{ \"error\": \"Error generating JSON: {ex.Message}\" }}";
         }
     }
 

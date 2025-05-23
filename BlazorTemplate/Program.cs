@@ -8,7 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.FluentUI.AspNetCore.Components;
+
 namespace BlazorTemplate;
+
 internal static class Program
 {
     [STAThread]
@@ -18,12 +20,15 @@ internal static class Program
         var host = CreateHost();
         var services = host.Services;
         var mainForm = services.GetRequiredService<BlazorForm>();
+
         AppDomain.CurrentDomain.UnhandledException += (sender, error) =>
         {
             System.Windows.Forms.MessageBox.Show(text: error.ExceptionObject.ToString(), caption: "Error");
         };
+
         Application.Run(mainForm);
     }
+
     static IHost CreateHost()
     {
         return Host.CreateDefaultBuilder()
@@ -44,11 +49,12 @@ internal static class Program
                     )
                 );
 
-                // Registrar el servicio de órdenes seleccionadas
+                // Register the selected orders service
                 services.AddSingleton<ISelectedOrdersService, SelectedOrdersService>();
 
-                // Registrar el servicio de batches
+                // Register the batch service
                 services.AddSingleton<IBatchService, BatchService>();
+
                 services.AddSingleton<IDatabaseConnection>(sp =>
                 {
                     return new SQLDatabaseConnection(
@@ -58,6 +64,7 @@ internal static class Program
                         context.Configuration.GetSection("SqlConnection").GetValue<string>("Password")
                     );
                 });
+
                 services.AddSingleton<SQLManagement>();
             })
             .ConfigureLogging((context, logging) =>
