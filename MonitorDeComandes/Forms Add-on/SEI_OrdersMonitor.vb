@@ -1,6 +1,8 @@
-﻿Imports System.Collections.Generic
+﻿Imports System.Buffers
+Imports System.Collections.Generic
 Imports System.IO
 Imports System.Linq
+Imports System.Security.Authentication.ExtendedProtection
 Imports System.Threading.Tasks
 Imports System.Xml.Linq
 Imports CrystalDecisions.Shared.Json
@@ -25,6 +27,7 @@ Public Class SEI_OrdersMonitor
         Const btnCreateInvoice As String = "btInvoice"
         Const btnCreateDelivery As String = "btDelivery"
         Const btnFilter As String = "btFilter"
+        Const btEdit As String = "btEdit"
         Const cbOrderSt As String = "cbOrder"
         Const cbOperatorSt As String = "cbOper"
         Const cbColor As String = "cbColor"
@@ -72,6 +75,9 @@ Public Class SEI_OrdersMonitor
                         HandleBtnCreateInvoices(pVal, BubbleEvent)
                     Case FormControls.btnFilter
                         HandleBtnFilter(pVal, BubbleEvent)
+                    Case FormControls.btEdit
+                        HandleEditOrderStatus(pVal, BubbleEvent)
+
                 End Select
             End If
         Catch ex As Exception
@@ -209,6 +215,7 @@ Public Class SEI_OrdersMonitor
                         isOrderSelected = True
 
                     ElseIf sendChecked = "Y" And operatorStatus <> "C" Then
+                        isOrderSelected = True
                         SBO_Application.StatusBar.SetText("You cannot create a delivery, the order is not confirmed.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                     End If
                 Next
@@ -254,6 +261,7 @@ Public Class SEI_OrdersMonitor
                         isOrderSelected = True
 
                     ElseIf sendChecked = "Y" And orderStatus <> "Delivered" Then
+                        isOrderSelected = True
                         SBO_Application.StatusBar.SetText("You cannot create an invoice, there is no delivery created.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
                     End If
                 Next
@@ -272,10 +280,68 @@ Public Class SEI_OrdersMonitor
         End If
     End Sub
 
+    Private Sub HandleEditOrderStatus(pVal As ItemEvent, ByRef BubbleEvent As Boolean)
+
+        If pVal.EventType <> BoEventTypes.et_ITEM_PRESSED Then Exit Sub
+        If Not pVal.BeforeAction Then
+            Try
+                Dim grid As SAPbouiCOM.Grid = Me.Form.Items.Item(FormControls.grid).Specific
+                Dim isOrderSelected As Boolean = False
+                For i As Integer = 0 To grid.Rows.Count - 1
+                    Dim sendChecked As String = grid.DataTable.GetValue("Send", i)
+                    Dim OperatorStatus As String = grid.DataTable.GetValue("OperatorStatus", i)
+
+
+                    If sendChecked = "Y" And OperatorStatus = "R" Then
+                        isOrderSelected = True
+                        Dim docEntry As Integer = grid.DataTable.GetValue("DocEntry", i)
+                        Dim orderDueDate As Date = grid.DataTable.GetValue("DueDate", i)
+
+                        Dim OperatorDocDueDate As Date = GetDueDate(docEntry)
+
+                        If orderDueDate <> OperatorDocDueDate Then
+                            PatchOrderStatusToNull(docEntry)
+                            DeleteUDORecord(docEntry)
+                        End If
+
+                    ElseIf sendChecked = "Y" And OperatorStatus <> "R" Then
+                        isOrderSelected = True
+                        SBO_Application.StatusBar.SetText("You cannot edit  an order, because it's not rejected.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                    End If
+
+                Next
+                If Not isOrderSelected Then
+                    SBO_Application.StatusBar.SetText("No order selected. Please select at least one order to create it's invoice.", BoMessageTime.bmt_Short, BoStatusBarMessageType.smt_Error)
+                    Exit Sub
+                Else
+                    LoadOrdersDataInGridWithFiltration()
+
+                End If
+
+            Catch ex As Exception
+                SBO_Application.StatusBar.SetText($"{ex.Message}")
+
+            End Try
+        End If
+    End Sub
+
 #End Region
 
 #Region "FUINCIONES GENERALES"
 
+    Private Function GetDueDate(docEntry As Integer) As Date
+        Dim rs As SAPbobsCOM.Recordset
+        Dim udoDueDate As DateTime
+        rs = Me.m_ParentAddon.SBO_Company.GetBusinessObject(BoObjectTypes.BoRecordset)
+        Dim query = $"
+                    SELECT U_DocDueDate FROM [@CONFORDERS] WHERE U_OrderId = {docEntry}"
+        rs.DoQuery(query)
+        If Not rs.EoF Then
+            udoDueDate = Date.Parse(rs.Fields.Item("U_DocDueDate").Value)
+        End If
+
+        Return udoDueDate
+    End Function
     Private Async Function PostDelivery(orders As List(Of Order)) As Task
         Try
             For Each orderBasic In orders
@@ -472,6 +538,35 @@ Public Class SEI_OrdersMonitor
         End Try
 
     End Function
+    Private Async Function PatchOrderStatusToNull(DocEntry As Integer) As Task
+        Try
+            Dim json As JObject = New JObject() From {
+            {"U_OrdersStatus", Nothing}
+        }
+
+            Await m_SBOAddon.oSLConnection.Request($"Orders({DocEntry})").PatchAsync(json)
+        Catch ex As Exception
+            Throw New Exception(ex.Message)
+        End Try
+    End Function
+
+    Private Async Function DeleteUDORecord(orderId As Integer) As Task
+        Try
+            Dim udoTableName As String = "CONFORDERS"
+
+
+            Dim response = Await m_SBOAddon.oSLConnection.Request(udoTableName).Filter($"U_OrderId eq {orderId}").GetAllAsync(Of JObject)()
+            If response Is Nothing OrElse response.Count = 0 Then
+                Throw New Exception($"No record found with U_OrderId = {orderId}")
+            End If
+
+            Dim docEntry As Integer = CInt(response(0)("DocEntry"))
+
+            Await m_SBOAddon.oSLConnection.Request($"{udoTableName}({docEntry})").DeleteAsync()
+        Catch ex As Exception
+            Throw New Exception($"Failed to delete UDO record: {ex.Message}")
+        End Try
+    End Function
 
     Private Sub LoadOrdersDataInGridWithFiltration()
 
@@ -644,7 +739,7 @@ Public Class SEI_OrdersMonitor
                     Case "Yellow"
                         query &= " AND Status = 'Sent'"
                     Case "Red"
-                        query &= " AND Status = 'Error'"
+                        query &= " AND Status = 'Rejected'"
                     Case "Light Green"
                         query &= " AND Status = 'Confirmed'"
                     Case "Green"
@@ -1056,8 +1151,8 @@ Public Class SEI_OrdersMonitor
 
             If status = "Sent" Then
                 grid.CommonSetting.SetRowBackColor(i + 1, RGB(255, 255, 0)) 'YELLOW
-            ElseIf status = "Error" Then
-                grid.CommonSetting.SetRowBackColor(i + 1, RGB(139, 0, 0)) 'RED
+            ElseIf status = "Rejected" Then
+                grid.CommonSetting.SetRowBackColor(i + 1, RGB(255, 0, 0)) 'RED
             ElseIf status = "Confirmed" Then
                 grid.CommonSetting.SetRowBackColor(i + 1, RGB(144, 238, 144)) 'LIGHT GREEN
             ElseIf status = "Delivered" Then

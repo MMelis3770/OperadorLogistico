@@ -70,7 +70,7 @@ Public Class SEI_CreateTablesSL
                 canCancel:=BoYesNoEnum.tYES,
                 canClose:=BoYesNoEnum.tYES,
                 defaultForm:=BoYesNoEnum.tNO,
-                canDelete:=BoYesNoEnum.tNO,
+                canDelete:=BoYesNoEnum.tYES,
                 canFind:=BoYesNoEnum.tYES,
                 canLog:=BoYesNoEnum.tYES,
                 canYearTransfer:=BoYesNoEnum.tNO,
